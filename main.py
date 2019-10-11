@@ -1,23 +1,44 @@
+from item import items
+from combination import combinations
+from setting import settings
+import random
+import spacy
+import en_core_web_sm
 
+if __name__ == '__main__':
+	print("Welcome to PCG adventures!")
 
+	# 1. Enter name and story length [# of paragraphs]
+	name = input("Please enter your name: ")
+	paragraphs = int(input("Welcome %s. How long should your journey be (# of paragraphs)? " % name))
 
+	# 2. Select setting [middle age, fantasy, horror]
+	# -> Load individual checkpoints and items
+	setting = ""
+	while True:
+		setting = input("So %d paragraphs. And what setting do you prefer? [fantasy, sci-fy] " % paragraphs)
+		if setting in settings.keys():
+			break
+		else:
+			print("Please enter a setting name.")
+	print("So our story takes place in a %s world." % setting)
 
+	# 3. Load/generate introduction [Place, Time, Crew, Items]
+	# -> place items in first place.
+	introduction = random.choice(settings[setting].introductions)
 
-# Define items
-items = [saw, wood]
-combinations = [
-	[[saw,wood], boat, "Saw and wood were combined to a boat."]
-]
+	# Replace [name]
+	introduction = introduction.replace("[name]", name)
+	print(introduction)
 
-# 1. Enter name and story length [# of paragraphs]
+	# 4. NLP on introduction [Extract People, Places, Items]
+	inventory = []
+	nlp = spacy.load("en_core_web_sm")
+	doc = nlp(introduction)
 
-# 2. Select setting [middle age, fantasy, horror]
-# -> Load individual checkpoints and items
+	for ent in doc.ents:
+		print(ent.text, ent.start_char, ent.end_char, ent.label_)
 
-# 3. Load/generate introduction [Place, Time, Crew, Items]
-# -> place items in first place.
-
-# 4. NLP on introduction [Extract People, Places, Items]
 
 # 5. Extract relation of characters
 
