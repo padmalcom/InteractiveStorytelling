@@ -6,6 +6,21 @@ import spacy
 import en_core_web_sm
 
 if __name__ == '__main__':
+
+	# initialization
+	inventory = []
+	known_places = []
+	known_people = []
+	nlp = spacy.load("en_core_web_sm") # en_core_web_lg
+	name = ""
+	paragraphs = 0
+	setting = ""
+	introduction = ""
+	items_in_paragraph = []
+	places_in_paragraph = []
+	people_in_paragraph = []
+	events_in_paragraph = []
+
 	print("Welcome to PCG adventures!")
 
 	# 1. Enter name and story length [# of paragraphs]
@@ -14,7 +29,6 @@ if __name__ == '__main__':
 
 	# 2. Select setting [middle age, fantasy, horror]
 	# -> Load individual checkpoints and items
-	setting = ""
 	while True:
 		setting = input("So %d paragraphs. And what setting do you prefer? [fantasy, sci-fy] " % paragraphs)
 		if setting in settings.keys():
@@ -25,25 +39,53 @@ if __name__ == '__main__':
 
 	# 3. Load/generate introduction [Place, Time, Crew, Items]
 	# -> place items in first place.
-	introduction = random.choice(settings[setting].introductions)
+	paragraph = random.choice(settings[setting].introductions)
 
-	# Replace [name]
-	introduction = introduction.replace("[name]", name)
-	print(introduction)
+	paragraph_count = 0
 
-	# 4. NLP on introduction [Extract People, Places, Items]
-	inventory = []
-	nlp = spacy.load("en_core_web_sm")
-	doc = nlp(introduction)
+	while paragraph_count < paragraphs:
 
-	for ent in doc.ents:
-		print(ent.text, ent.start_char, ent.end_char, ent.label_)
+		# Replace [name]
+		paragraph = paragraph.replace("[name]", name)
+		print(paragraph)
 
+		# 4. NLP on paragraph [Extract People, Places, Items]
+		doc = nlp(paragraph)
 
-# 5. Extract relation of characters
+		for ent in doc.ents:
+			print(ent.text, ent.start_char, ent.end_char, ent.label_)
+			if ent.label_ == "PERSON" and ent.text != name:
+				people_in_paragraph.append(ent.text)
+			elif ent.label_ == "GPE" or ent.label_ == "LOC":
+				places_in_paragraph.append(ent.text)
+			elif ent.label_ == "EVENT": # talk about event
+				events_in_paragraph.append(ent.text)
+			elif ent.label_ == "PRODUCT":
+				items_in_paragraph.append(ent.text)
+		
+		# 5. Extract relation of characters - ignored
 
-# 6. Generate actions [Talk to, Take [item] {based on nlp}, go to [Place], Inspect [Item, Place, Person, Item in inventory], Push, Pull {fun?},
-# insult/compliment [Person], use [item], combine [item, item]]
+		# 6. Generate actions [Talk to, Take [item] {based on nlp}, go to [Place], Inspect [Item, Place, Person, Item in inventory], Push, Pull {fun?},
+		# insult/compliment [Person], use [item], combine [item, item]]
+		for person in people_in_paragraph:
+			print("[talk to %s]"%person)
+			print("[look to %s]"%person)
+			print("[insult to %s]"%person)
+			print("[compliment to %s]"%person)
+			print("[%s who are you?]"%person)
+		for place in places_in_paragraph:
+			print("[go to %s]"%place)
+			print("[inspect %s]"%place)
+		for event in events_in_paragraph:
+			print("[Think about %s]"%event)
+		for item in items_in_paragraph:
+			print("[take %s]"%item)
+			print("[use %s]"%item)
+			print("[push %s]"%item)
+
+		paragraph_count +=1
+
+		
 
 # 7. Write twine paragraph including actions
 
