@@ -6,6 +6,7 @@ import random
 import spacy
 import en_core_web_lg
 import gpt_2_simple as gpt2
+import os
 
 # pyqt5
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -117,7 +118,8 @@ class InteractiveStoryUI(object):
         self.html = "<html><body>"
         self.html_end = "</body></html>"
         self.action_buttons = []
-        #gpt2.download_gpt2(model_name="124M")
+        if not os.path.isdir("./models/124M"):
+            gpt2.download_gpt2(model_name="124M")
         self.session = gpt2.start_tf_sess()
         gpt2.load_gpt2(self.session, model_name="124M")
 
