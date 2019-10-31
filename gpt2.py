@@ -11,7 +11,7 @@ class GPT2:
         # parameters
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.n_gpu = torch.cuda.device_count()
-        self.seed = 0
+        self.seed = 42
         self.stop_token = None
         self.num_samples = 1
         self.sample_length = 200
