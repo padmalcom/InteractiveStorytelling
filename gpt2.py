@@ -1,93 +1,94 @@
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-import torch
-import numpy as np
-from tqdm import trange
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-#from transformers import GPT2Config, OpenAIGPTConfig, XLNetConfig, TransfoXLConfig, XLMConfig, CTRLConfig
+from tqdm import trange
+import torch
+import torch.nn.functional as F
+import numpy as np
+from transformers import GPT2Config
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 class GPT2:
 
-    def __init__(self):
-        # parameters
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.n_gpu = torch.cuda.device_count()
-        self.seed = 42
-        self.stop_token = None
-        self.num_samples = 1
-        self.sample_length = 200
+    def set_seed(self, seed, n_gpu):
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if n_gpu > 0:
+            torch.cuda.manual_seed_all(seed)
 
-        # ??? parameters
-        self.temperature = 1.0
-        self.top_k = 0
-        self.top_p = 0.9
-
-        # set seed
-        np.random.seed(self.seed)
-        torch.manual_seed(self.seed)
-        if self.n_gpu > 0:
-            torch.cuda.manual_seed_all(self.seed)
-
-        # models
-        # ('gpt2', 'gpt2-medium', 'gpt2-large', 'distilgpt2', 'openai-gpt', 'xlnet-base-cased', 'xlnet-large-cased', 'transfo-xl-wt103', 'xlm-mlm-en-2048', 'xlm-mlm-ende-1024', 'xlm-mlm-enfr-1024', 'xlm-mlm-enro-1024', 'xlm-mlm-tlm-xnli15-1024', 'xlm-mlm-xnli15-1024', 'xlm-clm-enfr-1024', 'xlm-clm-ende-1024', 'xlm-mlm-17-1280', 'xlm-mlm-100-1280', 'ctrl')
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2')
-        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        self.model.to(self.device)
-        self.model.eval()
-
-    def generate(self, history, sample_length=100, num_samples=1):
-        context = self.tokenizer.encode(history, add_special_tokens=False)
-
-        # generator
-        context = torch.tensor(context, dtype=torch.long, device=self.device)
-        context = context.unsqueeze(0).repeat(num_samples, 1)
-        generated = context
-        with torch.no_grad():
-            for _ in trange(sample_length):
-                inputs = {'input_ids': generated}
-                outputs = self.model(**inputs)  # Note: we could also use 'past' with GPT-2/Transfo-XL/XLNet/CTRL (cached hidden-states)
-                next_token_logits = outputs[0][0, -1, :] / (self.temperature if self.temperature > 0 else 1.)
-
-                # reptition penalty from CTRL (https://arxiv.org/abs/1909.05858)
-                #for _ in set(generated.view(-1).tolist()):
-                #    next_token_logits[_] /= repetition_penalty
-                        
-                filtered_logits = self.top_k_top_p_filtering(next_token_logits)
-                if self.temperature == 0: #greedy sampling:
-                    next_token = torch.argmax(filtered_logits).unsqueeze(0)
-                else:
-                    next_token = torch.multinomial(torch.nn.functional.softmax(filtered_logits, dim=-1), num_samples=1)
-                generated = torch.cat((generated, next_token.unsqueeze(0)), dim=1)
-
-        # print
-        out = generated[0, len(context):].tolist()
-        text = self.tokenizer.decode(out, clean_up_tokenization_spaces=True, skip_special_tokens=True)
-        text = text[: text.find(self.stop_token) if self.stop_token else None]
-        return text
-
-
-    def top_k_top_p_filtering(self, logits, filter_value=-float('Inf')):
-        assert logits.dim() == 1  # batch size 1 for now - could be updated for more but the code would be less clear
-        new_top_k = min(self.top_k, logits.size(-1))  # Safety check
-        if new_top_k > 0:
+    def top_k_top_p_filtering(self, logits):
+        top_k = 0
+        top_p = 0.9
+        filter_value=-float('Inf')
+        top_k = min(top_k, logits.size(-1))  # Safety check
+        if top_k > 0:
             # Remove all tokens with a probability less than the last token of the top-k
-            indices_to_remove = logits < torch.topk(logits, new_top_k)[0][..., -1, None]
+            indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
             logits[indices_to_remove] = filter_value
 
-        if self.top_p > 0.0:
+        if top_p > 0.0:
             sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-            cumulative_probs = torch.cumsum(torch.nn.functional.softmax(sorted_logits, dim=-1), dim=-1)
+            cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
             # Remove tokens with cumulative probability above the threshold
-            sorted_indices_to_remove = cumulative_probs > self.top_p
+            sorted_indices_to_remove = cumulative_probs > top_p
             # Shift the indices to the right to keep also the first token above the threshold
             sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
             sorted_indices_to_remove[..., 0] = 0
 
-            indices_to_remove = sorted_indices[sorted_indices_to_remove]
+            # scatter sorted tensors to original indexing
+            indices_to_remove = sorted_indices_to_remove.scatter(dim=1, index=sorted_indices, src=sorted_indices_to_remove)
             logits[indices_to_remove] = filter_value
         return logits
 
 
+    def sample_sequence(self, model, length, context):
+        num_samples=1
+        context = torch.tensor(context, dtype=torch.long, device=self.device)
+        context = context.unsqueeze(0).repeat(num_samples, 1)
+        generated = context
+        with torch.no_grad():
+            for _ in trange(length):
 
+                inputs = {'input_ids': generated}
 
+                outputs = model(**inputs)  # Note: we could also use 'past' with GPT-2/Transfo-XL/XLNet/CTRL (cached hidden-states)
+                next_token_logits = outputs[0][:, -1, :]
 
+                # repetition penalty from CTRL (https://arxiv.org/abs/1909.05858)
+                for i in range(num_samples):
+                    for _ in set(generated[i].tolist()):
+                        next_token_logits[i, _] /= 1.0
+                    
+                filtered_logits = self.top_k_top_p_filtering(next_token_logits)
+                if self.temperature == 0: # greedy sampling:
+                    next_token = torch.argmax(filtered_logits, dim=-1).unsqueeze(-1)
+                else:
+                    next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
+                generated = torch.cat((generated, next_token), dim=1)
+        return generated
+
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.n_gpu = torch.cuda.device_count()
+        self.set_seed(42, self.n_gpu)
+        self.num_samples = 1
+        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-large")
+        self.model = GPT2LMHeadModel.from_pretrained("gpt2-large")
+        self.model.to(self.device)
+        self.model.eval()
+        self.temperature = 1.0
+
+    def generate(self, prefix, length):
+        length = 20
+
+        context_tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
+
+        out = self.sample_sequence(model=self.model, context=context_tokens, length=length,)
+        out = out[:, len(context_tokens):].tolist()
+        for o in out:
+            text = self.tokenizer.decode(o, clean_up_tokenization_spaces=True)
+            #text = text[: text.find(stop_token) if stop_token else None]
+
+            print(text)
+
+        return text
