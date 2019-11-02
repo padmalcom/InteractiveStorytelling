@@ -40,12 +40,14 @@ class GPT2:
             logits[indices_to_remove] = filter_value
         return logits
 
+    def __sample_sequence__(self, model, length, context):
+        return __sample_sequences__(model, length, context, 1)[0]
 
-    def sample_sequence(self, model, length, context):
-        num_samples=1
+    def __sample_sequences__(self, model, length, context, num_samples):
         context = torch.tensor(context, dtype=torch.long, device=self.device)
         context = context.unsqueeze(0).repeat(num_samples, 1)
         generated = context
+        result = []
         with torch.no_grad():
             for _ in trange(length):
 
@@ -65,7 +67,8 @@ class GPT2:
                 else:
                     next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
                 generated = torch.cat((generated, next_token), dim=1)
-        return generated
+                result.append(generated)
+        return result
 
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,17 +81,18 @@ class GPT2:
         self.model.eval()
         self.temperature = 1.0
 
-    def generate(self, prefix, length):
-        length = 20
+    def generate_texts(self, prefix, length, num_samples):
 
         context_tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
 
-        out = self.sample_sequence(model=self.model, context=context_tokens, length=length,)
+        out = self.__sample_sequences__(model=self.model, context=context_tokens, length=length,num_samples=num_samples)
         out = out[:, len(context_tokens):].tolist()
+        result = []
         for o in out:
             text = self.tokenizer.decode(o, clean_up_tokenization_spaces=True)
-            #text = text[: text.find(stop_token) if stop_token else None]
+            result.append(text)
 
-            print(text)
+        return result
 
-        return text
+    def generate_text(self, prefix, length):
+        return self.generate_texts(prefix, length, 1)[0]

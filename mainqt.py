@@ -5,7 +5,7 @@ from functools import partial
 import random
 import spacy
 import en_core_web_lg
-import gpt_2_simple as gpt2
+from gpt2 import GPT2
 import os
 
 # pyqt5
@@ -111,17 +111,17 @@ class InteractiveStoryUI(object):
         self.places_in_paragraph = []
         self.people_in_paragraph = []
         self.events_in_paragraph = []
+        self.nouns_in_paragraph = []
         self.paragraph_count = 0
         self.name = ""
         self.setting = ""
+        self.setting_id = 0
         self.text = ""
         self.html = "<html><body>"
         self.html_end = "</body></html>"
         self.action_buttons = []
-        if not os.path.isdir("./models/124M"):
-            gpt2.download_gpt2(model_name="124M")
-        self.session = gpt2.start_tf_sess()
-        gpt2.load_gpt2(self.session, model_name="124M")
+        self.gpt2 = GPT2()
+        self.USE_NOUNS = True
 
         # gpt adventure
         self.STRICT_MODE = True
@@ -150,8 +150,9 @@ class InteractiveStoryUI(object):
             return False
 
     def generateText(self, history, action):
-        gpo=gpt2.generate(self.session, temperature=0.1,prefix=history, model_name="124M",length=100,return_as_list=True,nsamples=3,batch_size=3,top_p=0.99)
-        for candidate in gpo:
+        texts = self.gpt2.generate_texts(history, 100, 3)
+
+        for candidate in texts:
             goodCandidate=False
             result=candidate
             sentences=result.split("\n")
@@ -180,7 +181,14 @@ class InteractiveStoryUI(object):
                 return "I don't know what to to."
 
     def generateEnd(self):
-        ui.textEdit.setHtml(self.html + " The End " + self.html_end)
+        ending_text = settings["fantasy"].endings[self.setting_id]
+        ending_text = ending_text.replace("[name]", self.name)
+        html_ending = self.highlightEntities(ending_text)
+        html_ending = html_ending.replace(self.name, "<b>" + self.name + "</b>")
+
+        self.text = self.text + ending_text
+        self.html = self.html + html_ending
+        ui.textEdit.setHtml(self.html + self.html_end)
 
     def clickAction(self, action):
         ui.textEdit.setHtml(self.html + action + self.html_end)
@@ -224,6 +232,7 @@ class InteractiveStoryUI(object):
         self.places_in_paragraph.clear()
         self.events_in_paragraph.clear()
         self.items_in_paragraph.clear()
+        self.nouns_in_paragraph.clear()
 
         # 4.2 extract each entity
         for ent in doc.ents:
@@ -237,6 +246,28 @@ class InteractiveStoryUI(object):
             elif ent.label_ == "PRODUCT" and not ent.text in self.items_in_paragraph:
                 self.items_in_paragraph.append(ent.text)
 
+        # Extract nouns
+        if (self.USE_NOUNS):
+            for token in doc:
+                # print(token.text, token.pos_, token.dep_, token.head.text)
+                if token.pos_ == 'NOUN':
+                    self.nouns_in_paragraph.append(token.text)
+
+    def highlightEntities(self, text):
+        for person in self.people_in_paragraph:
+            text = text.replace(person, "<b><font color=\"red\">" + person + "</font></b>")
+        for place in self.places_in_paragraph:
+            text = text.replace(place, "<b><font color=\"green\">" + place + "</font></b>")
+        for event in self.events_in_paragraph:
+            text = text.replace(event, "<b><font color=\"yellow\">" + event + "</font></b>")
+        for item in self.items_in_paragraph:
+            text = text.replace(item, "<b><font color=\"purple\">" + item + "</font></b>")
+
+        if (self.USE_NOUNS):
+            for noun in self.nouns_in_paragraph:
+                text = text.replace(noun, "<b><font color=\"blue\">" + noun + "</font></b>")
+        return text
+
     def createButtons(self):
         # 5.2 Are there any buttons? Destroy
         for button in self.action_buttons:
@@ -246,107 +277,63 @@ class InteractiveStoryUI(object):
 
         # 5.3 Check if there are any actions
         if (len(self.people_in_paragraph) > 0 or len(self.places_in_paragraph) > 0 or
-            len(self.events_in_paragraph) > 0 or len(self.items_in_paragraph) > 0):
+            len(self.events_in_paragraph) > 0 or len(self.items_in_paragraph) > 0 or
+            (len(self.nouns_in_paragraph) > 0 and self.USE_NOUNS)):
 
             # 6. Generate actions [Talk to, Take [item] {based on nlp}, go to [Place], Inspect [Item, Place, Person, Item in inventory], Push, Pull {fun?},
             # insult/compliment [Person], use [item], combine [item, item]]
             for person in self.people_in_paragraph:
-                print("Processing person %s"%person)
+                actions = ["compliment", "insult", "look at", "who are you,"]
+                for action in actions:
+                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                    self.action_buttons[-1].setText(action + " " + person)
+                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                    self.action_buttons[-1].setToolTip(action + " " + person)                    
+                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + person))
 
-                # Create buttons
-                self.action_buttons.append(QtWidgets.QPushButton())
-                self.action_buttons[-1].setText("Talk to " + person)
-                self.action_buttons[-1].setToolTip("Talk to " + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "Talk to " + person))
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("Look at " + person)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("Look at " + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "Look at " + person))                        
-
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("Insult " + person)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)    
-                self.action_buttons[-1].setToolTip("Insult " + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction,"Insult " + person))                                
-                
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("Compliment " + person)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("Compliment" + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction,"Compliment " + person))                        
-
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText(person + ", who are you?")
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)    
-                self.action_buttons[-1].setToolTip(person + ", who are you?")                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction,person + ", who are you?"))                    
-
-                # highthight html
-                self.html_paragraph = self.html_paragraph.replace(
-                    person, "<b><font color=\"red\">" + person + "</font></b>")
             for place in self.places_in_paragraph:
-                print("[go to %s]" % place)
-                print("[inspect %s]" % place)
+                actions = ["go to", "inspect"]
+                for action in actions:
+                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                    self.action_buttons[-1].setText(action + " " + place)
+                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                    self.action_buttons[-1].setToolTip(action + " " + place)                    
+                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + place))
 
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("go to " + place)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("go to " + place)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "go to " + place))                    
-
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("inspect " + place)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("inspect " + place)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "inspect " + place))                    
-
-                self.html_paragraph = self.html_paragraph.replace(
-                    place, "<b><font color=\"green\">" + place + "</font></b>")
             for event in self.events_in_paragraph:
-                print("[think about %s]" % event)
+                actions = ["think abount"]
+                for action in actions:
+                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                    self.action_buttons[-1].setText(action + " " + event)
+                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                    self.action_buttons[-1].setToolTip(action + " " + event)                    
+                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + event))
 
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("think about " + event)                    
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("think about " + event)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "think about " + event))                    
-
-                self.html_paragraph = self.html_paragraph.replace(
-                    event, "<b><font color=\"yellow\">" + event + "</font></b>")
             for item in self.items_in_paragraph:
-                print("[take %s]" % item)
-                print("[use %s]" % item)
-                print("[push %s]" % item)
+                actions = ["take", "use", "push"]
+                for action in actions:
+                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                    self.action_buttons[-1].setText(action + " " + item)
+                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                    self.action_buttons[-1].setToolTip(action + " " + item)                    
+                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + item))
 
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("take " + item)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("take " + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "take " + item))                    
+            if (self.USE_NOUNS):
+                for noun in self.nouns_in_paragraph:
+                    actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
+                    for action in actions:
+                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                        self.action_buttons[-1].setText(action + " " + noun)
+                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                        self.action_buttons[-1].setToolTip(action + " " + noun)                    
+                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + noun))
 
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("use " + item)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("use " + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "use " + item))                    
-
-                self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                self.action_buttons[-1].setText("push " + item)
-                self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                self.action_buttons[-1].setToolTip("push " + person)                    
-                self.action_buttons[-1].clicked.connect(partial(self.clickAction, "push " + item))                    
-
-                self.html_paragraph = self.html_paragraph.replace(
-                    item, "<b><font color=\"purple\">" + item + "</font></b>")
 
         # 6.2 Continue without taking an action 
         self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
         self.action_buttons[-1].setText("continue")
         self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-        self.action_buttons[-1].setToolTip("continue")                    
+        self.action_buttons[-1].setToolTip("continue")
         self.action_buttons[-1].clicked.connect(partial(self.clickAction, ""))
 
     def startNewGame(self):
@@ -363,8 +350,9 @@ class InteractiveStoryUI(object):
 
         # 3. Load/generate introduction [Place, Time, Crew, Items]
         # -> place items in first place.
-        #self.paragraph = random.choice(settings[self.setting].introductions)
-        self.paragraph = settings["fantasy"].introductions[0]
+        self.setting_id = random.randrange(0, len(settings["fantasy"].introduction)-1)
+        self.setting_id = 0 # temporary
+        self.paragraph = settings["fantasy"].introductions[self.setting_id]
 
         if self.paragraph_count < self.paragraphs:
 
@@ -374,11 +362,14 @@ class InteractiveStoryUI(object):
 
             self.extractEntities()
 
+            # temporary element to be appended to html and text
             self.html_paragraph = self.paragraph
 
-            # 5.1 Clean up buttons
-
+            # 5.1 Clean up buttons and create new
             self.createButtons()
+
+            # Highlight entities
+            self.html_paragraph = self.highlightEntities(self.html_paragraph)
 
             # append paragraph
             self.text = self.text + self.paragraph
@@ -390,29 +381,11 @@ class InteractiveStoryUI(object):
             self.html = self.html + self.html_paragraph
             ui.textEdit.setHtml(self.html + self.html_end)
 
-            mylist = gpt2.generate(self.session, temperature=0.1,prefix=self.text, model_name="124M",length=100,return_as_list=True,nsamples=3,batch_size=3,top_p=0.99)
-            for index, asd in enumerate(mylist):
-                print("item " + str(index) + ": " + asd)
-
-            # 7. Write twine paragraph including actions
-
-            # 8. Wait for player input
-
-            # 9. React to input and update meta data [add [place] to [known places], add [items], set [location], remove [item]]
-
-            # 10. Truncate text
-
             # 11. Increase paragraph counter
             self.paragraph_count += 1
 
-            # -> If end reached add text "So this is the end of our story."
-
-            # 12. Generate following paragraph
-            # If end is not reached -> Goto 4
         else:
-            self.text = self.text + "The end"
-            self.html = self.html + "<b>The end</b>"
-            ui.textEdit.setHtml(self.html + self.html_end)
+            self.generateEnd()
 
 
 if __name__ == '__main__':
