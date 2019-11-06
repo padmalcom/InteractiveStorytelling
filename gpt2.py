@@ -40,9 +40,6 @@ class GPT2:
             logits[indices_to_remove] = filter_value
         return logits
 
-    def __sample_sequence__(self, model, length, context):
-        return __sample_sequences__(model, length, context, 1)[0]
-
     def __sample_sequences__(self, model, length, context, num_samples):
         context = torch.tensor(context, dtype=torch.long, device=self.device)
         context = context.unsqueeze(0).repeat(num_samples, 1)
@@ -85,14 +82,13 @@ class GPT2:
 
         context_tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
 
-        out = self.__sample_sequences__(model=self.model, context=context_tokens, length=length,num_samples=num_samples)
-        out = out[:, len(context_tokens):].tolist()
-        result = []
-        for o in out:
-            text = self.tokenizer.decode(o, clean_up_tokenization_spaces=True)
-            result.append(text)
+        out = self.__sample_sequences__(model=self.model, context=context_tokens, length=length, num_samples=num_samples)
+
+        for t in out:
+            t = t[:, len(context_tokens):].tolist()
+            result = []
+            for o in t:
+                text = self.tokenizer.decode(o, clean_up_tokenization_spaces=True)
+                result.append(text)
 
         return result
-
-    def generate_text(self, prefix, length):
-        return self.generate_texts(prefix, length, 1)[0]
