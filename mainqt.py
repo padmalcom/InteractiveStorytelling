@@ -122,63 +122,29 @@ class InteractiveStoryUI(object):
         self.action_buttons = []
         self.gpt2 = GPT2()
         self.USE_NOUNS = True
+        self.MAX_ACTIONS = 12
 
         # gpt adventure
         self.STRICT_MODE = True
         self.alreadyDone = ""
         self.locContext = ""
 
-    def isContext(self, currentText): #is a iece of textthis a context change? (i.e. moving to a new room)
-        if "you are" in currentText or "we are" in currentText or "this is" in currentText or '''you're''' in currentText: #context change
-            return True
-        else:
-            return False
-
-    def isInvalidMove(self, playerAction, result): #gpt is trying to move the player when they didn't specify they wanted to move
-        if ("go ") in playerAction:
-            return False
-        else:
-            if self.isContext(result):
-                return True
-            else:
-                return False
-
-    def isTakeLoop(self, playerAction, result): #lets us detect a loop condition where the game just replies "taken" or "done" to everything
-        if "done" in result.lower() or ( "take" in result.lower() and "take" not in playerAction.lower()):
-            return True
-        else:
-            return False
+    def splitSentences(self, text, allowIncomplete=False):
+        self.nlp.add_pipe(self.nlp.create_pipe('sentencizer'))
+        doc = self.nlp(text)
+        sentences = [sent.string.strip() for sent in doc.sents]
+        # Check completion
+        result = []
+        for sentence in sentences:
+            doc = self.nlp(sentence)
+            if doc[len(doc)-1].is_punct or allowIncomplete:
+                result.append(sentence)
+        return result
 
     def generateText(self, history, action):
-        texts = self.gpt2.generate_texts(history, 100, 3)
-
-        for candidate in texts:
-            goodCandidate=False
-            result=candidate
-            sentences=result.split("\n")
-            newprompt=""
-            hasContext=False
-            for sentence in sentences:
-                words=sentence.split(" ")
-                if (sentence not in self.alreadyDone or len(words) <= 2) and sentence not in newprompt and (self.isTakeLoop(action,sentence)==False) and (self.isInvalidMove(action,sentence)==False):#avoid repeating things we've said in this or previous responses. If a response is very short (i.e. "taken" when you pick up an item) it's ok to repeat.
-                    if ("." in sentence or "?" in sentence or "!" in sentence) and (hasContext==False or self.isContext(sentence)==False) : #If it's a next player action, then stop, otherwise keep going
-                        newprompt=newprompt+sentence
-                        goodCandidate=True
-                    if self.isContext(sentence):
-                        hasContext=True
-                    else:
-                        if goodCandidate and self.STRICT_MODE: #This prevents GPT from taking actions on our behalf. If strict mode is on actions are never taken, if it is off they are taklen but not shown to us. Strict mode on can make the game more playable at the expense of less interesting descriptions 
-                            break
-            if goodCandidate:
-                break
-            if len(newprompt) > 3: #this will be blank if GPT couldn't come up with anything
-                if self.isContext(newprompt): #This is updating the location context
-                    self.locContext=newprompt
-                self.alreadyDone=self.alreadyDone+newprompt+"\n"
-                return newprompt.replace(".","\n")
-            else:
-                self.alreadyDone=self.alreadyDone+"\n"+action
-                return "I don't know what to to."
+        text = self.gpt2.generate_text(history, 100)
+        sentences = self.splitSentences(text, False)
+        return " ".join(sentences)
 
     def generateEnd(self):
         ending_text = settings["fantasy"].endings[self.setting_id]
@@ -190,13 +156,15 @@ class InteractiveStoryUI(object):
         self.html = self.html + html_ending
         ui.textEdit.setHtml(self.html + self.html_end)
 
-    def clickAction(self, action):
-        ui.textEdit.setHtml(self.html + action + self.html_end)
+    def clickAction(self, action, entity):
+
+        # Todo: Select action template
+        action_sentence = action + " " + entity + "."
+
         if self.paragraph_count < self.paragraphs:
 
-            # Todo: highlight NER in html
-            self.text = self.text + action
-            self.html = self.html + action
+            self.text = self.text + action_sentence
+            self.html = self.html + action_sentence
 
             # extend action by gpt-2
 
@@ -282,51 +250,72 @@ class InteractiveStoryUI(object):
 
             # 6. Generate actions [Talk to, Take [item] {based on nlp}, go to [Place], Inspect [Item, Place, Person, Item in inventory], Push, Pull {fun?},
             # insult/compliment [Person], use [item], combine [item, item]]
+            action_count = 0
             for person in self.people_in_paragraph:
                 actions = ["compliment", "insult", "look at", "who are you,"]
                 for action in actions:
-                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                    self.action_buttons[-1].setText(action + " " + person)
-                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                    self.action_buttons[-1].setToolTip(action + " " + person)                    
-                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + person))
+                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                        break
+                    else:
+                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                        self.action_buttons[-1].setText(action + " " + person)
+                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                        self.action_buttons[-1].setToolTip(action + " " + person)                    
+                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, person))
+                        action_count +=1
 
             for place in self.places_in_paragraph:
                 actions = ["go to", "inspect"]
                 for action in actions:
-                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                    self.action_buttons[-1].setText(action + " " + place)
-                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                    self.action_buttons[-1].setToolTip(action + " " + place)                    
-                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + place))
+                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                        break
+                    else:                    
+                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                        self.action_buttons[-1].setText(action + " " + place)
+                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                        self.action_buttons[-1].setToolTip(action + " " + place)                    
+                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, place))
+                        action_count +=1
 
             for event in self.events_in_paragraph:
                 actions = ["think abount"]
                 for action in actions:
-                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                    self.action_buttons[-1].setText(action + " " + event)
-                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                    self.action_buttons[-1].setToolTip(action + " " + event)                    
-                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + event))
+                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                        break
+                    else:
+                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                        self.action_buttons[-1].setText(action + " " + event)
+                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                        self.action_buttons[-1].setToolTip(action + " " + event)                    
+                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, event))
+                        action_count +=1
 
             for item in self.items_in_paragraph:
                 actions = ["take", "use", "push"]
                 for action in actions:
-                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                    self.action_buttons[-1].setText(action + " " + item)
-                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                    self.action_buttons[-1].setToolTip(action + " " + item)                    
-                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + item))
+                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                        break
+                    else:
+                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                        self.action_buttons[-1].setText(action + " " + item)
+                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                        self.action_buttons[-1].setToolTip(action + " " + item)                    
+                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, item))
+                        action_count +=1
 
             if (self.USE_NOUNS):
                 for noun in self.nouns_in_paragraph:
                     actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
                     for action in actions:
-                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                        self.action_buttons[-1].setText(action + " " + noun)
-                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                        self.action_buttons[-1].setToolTip(action + " " + noun)                    
-                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action + " " + noun))
+                        if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                            break
+                        else:
+                            self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                            self.action_buttons[-1].setText(action + " " + noun)
+                            self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                            self.action_buttons[-1].setToolTip(action + " " + noun)                    
+                            self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, noun))
+                            action_count +=1
 
 
         # 6.2 Continue without taking an action 
@@ -334,7 +323,7 @@ class InteractiveStoryUI(object):
         self.action_buttons[-1].setText("continue")
         self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
         self.action_buttons[-1].setToolTip("continue")
-        self.action_buttons[-1].clicked.connect(partial(self.clickAction, ""))
+        self.action_buttons[-1].clicked.connect(partial(self.clickAction, "", ""))
 
     def startNewGame(self):
         ui.textEdit.setHtml(
@@ -350,7 +339,7 @@ class InteractiveStoryUI(object):
 
         # 3. Load/generate introduction [Place, Time, Crew, Items]
         # -> place items in first place.
-        self.setting_id = random.randrange(0, len(settings["fantasy"].introduction)-1)
+        self.setting_id = random.randrange(0, len(settings["fantasy"].introductions)-1)
         self.setting_id = 0 # temporary
         self.paragraph = settings["fantasy"].introductions[self.setting_id]
 

@@ -92,3 +92,10 @@ class GPT2:
                 result.append(text)
 
         return result
+
+    def generate_text(self, prefix, length):
+        texts = self.generate_texts(prefix, length, 1)
+        if (len(texts) > 0):
+            return texts[0]
+        else:
+            return ""
