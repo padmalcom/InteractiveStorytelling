@@ -6,7 +6,9 @@ import random
 import spacy
 import en_core_web_lg
 from gpt2 import GPT2
+from textblob import TextBlob
 import os
+from actiontemplates import ActionTemplates
 
 # pyqt5
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -123,15 +125,26 @@ class InteractiveStoryUI(object):
         self.gpt2 = GPT2()
         self.USE_NOUNS = True
         self.MAX_ACTIONS = 12
+        self.actionTemplates = ActionTemplates()
 
         # gpt adventure
         self.STRICT_MODE = True
         self.alreadyDone = ""
         self.locContext = ""
 
-    def splitSentences(self, text, allowIncomplete=False):
+    def getSentiment(self, text):
+        analysis = TextBlob(text) 
+        # set sentiment 
+        if analysis.sentiment.polarity > 0: 
+            return 'positive'
+        elif analysis.sentiment.polarity == 0: 
+            return 'neutral'
+        else: 
+            return 'negative'
+
+    def splitSentences(self, textExtract, allowIncomplete=False):
         self.nlp.add_pipe(self.nlp.create_pipe('sentencizer'))
-        doc = self.nlp(text)
+        doc = self.nlp(textExtract)
         sentences = [sent.string.strip() for sent in doc.sents]
         # Check completion
         result = []
@@ -141,7 +154,18 @@ class InteractiveStoryUI(object):
                 result.append(sentence)
         return result
 
-    def generateText(self, history, action):
+    def trucateLastSentences(self, textExtract, characters):
+        sentences = self.splitSentences(textExtract, False)
+        result = ""
+        for sentence in reversed(sentences):
+            if (len(result) > characters):
+                return result
+            else:
+                result = sentence + " " + result
+        return result
+
+
+    def generateText(self, history):
         text = self.gpt2.generate_text(history, 100)
         sentences = self.splitSentences(text, False)
         return " ".join(sentences)
@@ -158,36 +182,36 @@ class InteractiveStoryUI(object):
 
     def clickAction(self, action, entity):
 
-        # Todo: Select action template
-        action_sentence = action + " " + entity + "."
+        # Select action template
+        action_sentence = self.actionTemplates.getTemplate(action, self.name, entity)
 
         if self.paragraph_count < self.paragraphs:
 
-            self.text = self.text + action_sentence
-            self.html = self.html + action_sentence
+            self.text = self.text + " " + action_sentence
 
-            # extend action by gpt-2
+            # generate next paragraph
+            trucated_text = self.trucateLastSentences(self.text, 200)
+            new_text = self.generateText(trucated_text)
+            self.paragraph = action_sentence + " " + new_text
 
-            # add to text
-
-            # truncate and generate new text
-
+            # extract entities
             self.extractEntities()
+
             self.html_paragraph = self.paragraph
 
             # 5.1 Clean up buttons
-
             self.createButtons()
 
-            # append paragraph
-            self.text = self.text + self.paragraph
-
             # highlight player name
+            self.html_paragraph = self.highlightEntities(self.html_paragraph)
             self.html_paragraph = self.html_paragraph.replace(self.name, "<b>" + self.name + "</b>")
 
-            # append html and highlight
+            # append html and text
+            self.text = self.text + self.paragraph
             self.html = self.html + self.html_paragraph
             ui.textEdit.setHtml(self.html + self.html_end)
+
+            self.paragraph_count +=1
         else:
             self.generateEnd()
 
@@ -204,7 +228,6 @@ class InteractiveStoryUI(object):
 
         # 4.2 extract each entity
         for ent in doc.ents:
-            print(ent.text, ent.start_char, ent.end_char, ent.label_)
             if ent.label_ == "PERSON" and ent.text != self.name and not ent.text in self.people_in_paragraph:
                 self.people_in_paragraph.append(ent.text)
             elif (ent.label_ == "GPE" or ent.label_ == "LOC") and not ent.text in self.places_in_paragraph:
@@ -335,7 +358,6 @@ class InteractiveStoryUI(object):
 
         # 2. Select setting [middle age, fantasy, horror]
         self.setting = self.comboBox.currentText()
-        print("Setting %s" % self.setting)
 
         # 3. Load/generate introduction [Place, Time, Crew, Items]
         # -> place items in first place.
@@ -347,7 +369,6 @@ class InteractiveStoryUI(object):
 
             # Replace [name]
             self.paragraph = self.paragraph.replace("[name]", self.name)
-            print(self.paragraph)
 
             self.extractEntities()
 
