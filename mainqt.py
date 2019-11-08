@@ -9,6 +9,8 @@ from gpt2 import GPT2
 from textblob import TextBlob
 import os
 from actiontemplates import ActionTemplates
+from nltk.corpus import wordnet as wn
+import nltk
 
 # pyqt5
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -100,7 +102,7 @@ class InteractiveStoryUI(object):
         self.groupBox.setTitle(_translate("Dialog", "Actions"))
         self.groupBox_2.setTitle(_translate("Dialog", "Inventory"))
         self.lineEdit.setText(_translate("Dialog", "Jim"))
-        self.spinBox.setValue(2)
+        self.spinBox.setValue(4)
 
     def __init__(self):
         super().__init__()
@@ -126,11 +128,14 @@ class InteractiveStoryUI(object):
         self.USE_NOUNS = True
         self.MAX_ACTIONS = 12
         self.actionTemplates = ActionTemplates()
+        self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant"]
 
         # gpt adventure
         self.STRICT_MODE = True
         self.alreadyDone = ""
         self.locContext = ""
+
+        #nltk.download('wordnet')
 
     def getSentiment(self, text):
         analysis = TextBlob(text) 
@@ -143,13 +148,14 @@ class InteractiveStoryUI(object):
             return 'negative'
 
     def splitSentences(self, textExtract, allowIncomplete=False):
-        self.nlp.add_pipe(self.nlp.create_pipe('sentencizer'))
-        doc = self.nlp(textExtract)
+        nlp2 = spacy.load("en_core_web_lg")
+        nlp2.add_pipe(nlp2.create_pipe('sentencizer'), first=True)
+        doc = nlp2(textExtract)
         sentences = [sent.string.strip() for sent in doc.sents]
         # Check completion
         result = []
         for sentence in sentences:
-            doc = self.nlp(sentence)
+            doc = nlp2(sentence)
             if doc[len(doc)-1].is_punct or allowIncomplete:
                 result.append(sentence)
         return result
@@ -177,13 +183,18 @@ class InteractiveStoryUI(object):
         html_ending = html_ending.replace(self.name, "<b>" + self.name + "</b>")
 
         self.text = self.text + ending_text
+        temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + html_ending + "</span>"        
         self.html = self.html + html_ending
-        ui.textEdit.setHtml(self.html + self.html_end)
+        ui.textEdit.setHtml(temp_html + self.html_end)
 
     def clickAction(self, action, entity):
 
-        # Select action template
-        action_sentence = self.actionTemplates.getTemplate(action, self.name, entity)
+        # If no action is defined, just continue on the last text block.
+        if (action == "" and entity == ""):
+            action_sentence = ""
+        else:
+            # Select action template
+            action_sentence = self.actionTemplates.getTemplate(action, self.name, entity)
 
         if self.paragraph_count < self.paragraphs:
 
@@ -208,8 +219,9 @@ class InteractiveStoryUI(object):
 
             # append html and text
             self.text = self.text + self.paragraph
+            temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
             self.html = self.html + self.html_paragraph
-            ui.textEdit.setHtml(self.html + self.html_end)
+            ui.textEdit.setHtml(temp_html + self.html_end)
 
             self.paragraph_count +=1
         else:
@@ -240,9 +252,13 @@ class InteractiveStoryUI(object):
         # Extract nouns
         if (self.USE_NOUNS):
             for token in doc:
-                # print(token.text, token.pos_, token.dep_, token.head.text)
                 if token.pos_ == 'NOUN':
-                    self.nouns_in_paragraph.append(token.text)
+
+                    # Only allow man made objects
+                    for synset in wn.synsets(token.text):
+                        print("type: " + synset.lexname())
+                        if (synset.lexname() in self.acceptedNouns):
+                            self.nouns_in_paragraph.append(token.text)
 
     def highlightEntities(self, text):
         for person in self.people_in_paragraph:
@@ -265,6 +281,7 @@ class InteractiveStoryUI(object):
             self.groupBoxGridLayout.removeWidget(button)
             button.deleteLater()
             button = None
+        self.action_buttons.clear()
 
         # 5.3 Check if there are any actions
         if (len(self.people_in_paragraph) > 0 or len(self.places_in_paragraph) > 0 or
@@ -288,7 +305,7 @@ class InteractiveStoryUI(object):
                         action_count +=1
 
             for place in self.places_in_paragraph:
-                actions = ["go to", "inspect"]
+                actions = ["go to", "look at"]
                 for action in actions:
                     if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
                         break
@@ -301,7 +318,7 @@ class InteractiveStoryUI(object):
                         action_count +=1
 
             for event in self.events_in_paragraph:
-                actions = ["think abount"]
+                actions = ["think about"]
                 for action in actions:
                     if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
                         break
@@ -388,8 +405,9 @@ class InteractiveStoryUI(object):
             self.html_paragraph = self.html_paragraph.replace(self.name, "<b>" + self.name + "</b>")
 
             # append html and highlight
+            temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
             self.html = self.html + self.html_paragraph
-            ui.textEdit.setHtml(self.html + self.html_end)
+            ui.textEdit.setHtml(temp_html + self.html_end)
 
             # 11. Increase paragraph counter
             self.paragraph_count += 1
