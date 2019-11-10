@@ -11,6 +11,7 @@ import os
 from actiontemplates import ActionTemplates
 from nltk.corpus import wordnet as wn
 import nltk
+from nltk import ngrams
 
 # pyqt5
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -92,8 +93,10 @@ class InteractiveStoryUI(object):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Interactive Storytelling"))
         self.label.setText(_translate("Dialog", "Setting:"))
-        self.comboBox.setItemText(0, _translate("Dialog", "fantasy"))
-        self.comboBox.setItemText(1, _translate("Dialog", "sci-fy"))
+
+        allSettings = list(settings.keys())
+        for i,s in enumerate(allSettings):
+            self.comboBox.setItemText(i, _translate("Dialog", s))
         self.label_3.setText(_translate("Dialog", "Player name:"))
         self.pushButton_2.setText(_translate("Dialog", "Start game"))
         self.label_2.setText(_translate("Dialog", "Paragraphs:"))
@@ -126,9 +129,9 @@ class InteractiveStoryUI(object):
         self.action_buttons = []
         self.gpt2 = GPT2()
         self.USE_NOUNS = True
-        self.MAX_ACTIONS = 12
+        self.MAX_ACTIONS = 18
         self.actionTemplates = ActionTemplates()
-        self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant"]
+        self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"]
 
         # gpt adventure
         self.STRICT_MODE = True
@@ -177,7 +180,7 @@ class InteractiveStoryUI(object):
         return " ".join(sentences)
 
     def generateEnd(self):
-        ending_text = settings["fantasy"].endings[self.setting_id]
+        ending_text = settings["harry potter"].endings[self.setting_id]
         ending_text = ending_text.replace("[name]", self.name)
         html_ending = self.highlightEntities(ending_text)
         html_ending = html_ending.replace(self.name, "<b>" + self.name + "</b>")
@@ -218,9 +221,9 @@ class InteractiveStoryUI(object):
             self.html_paragraph = self.html_paragraph.replace(self.name, "<b>" + self.name + "</b>")
 
             # append html and text
-            self.text = self.text + self.paragraph
-            temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
-            self.html = self.html + self.html_paragraph
+            self.text = self.text + " " + self.paragraph
+            temp_html = self.html + " <span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
+            self.html = self.html + " " + self.html_paragraph
             ui.textEdit.setHtml(temp_html + self.html_end)
 
             self.paragraph_count +=1
@@ -256,8 +259,8 @@ class InteractiveStoryUI(object):
 
                     # Only allow man made objects
                     for synset in wn.synsets(token.text):
-                        print("type: " + synset.lexname())
-                        if (synset.lexname() in self.acceptedNouns):
+                        if ((synset.lexname() in self.acceptedNouns) and (not token.text in self.nouns_in_paragraph)):
+                            print("type: " + synset.lexname() + " value: " + token.text)
                             self.nouns_in_paragraph.append(token.text)
 
     def highlightEntities(self, text):
@@ -276,6 +279,18 @@ class InteractiveStoryUI(object):
         return text
 
     def createButtons(self):
+
+        # Todo rate ngrams
+        # https://stackoverflow.com/questions/54962539/how-to-get-the-probability-of-bigrams-in-a-text-of-sentences
+        # https://stackoverflow.com/questions/6462709/nltk-language-model-ngram-calculate-the-prob-of-a-word-from-context
+        sequence = nltk.tokenize.word_tokenize("Take shirt") 
+        bigram = ngrams(sequence,2)
+        freq_dist = nltk.FreqDist(bigram)
+        prob_dist = nltk.MLEProbDist(freq_dist)
+        number_of_bigrams = freq_dist.N()
+        print ("Probability of take shirt: " + str(prob_dist) + " number: " + str(number_of_bigrams))
+
+
         # 5.2 Are there any buttons? Destroy
         for button in self.action_buttons:
             self.groupBoxGridLayout.removeWidget(button)
@@ -366,6 +381,16 @@ class InteractiveStoryUI(object):
         self.action_buttons[-1].clicked.connect(partial(self.clickAction, "", ""))
 
     def startNewGame(self):
+        self.html = ""
+        self.html_paragraph = ""
+        self.paragraph = ""
+        self.paragraph_count = 0
+        self.people_in_paragraph.clear()
+        self.places_in_paragraph.clear()
+        self.events_in_paragraph.clear()
+        self.items_in_paragraph.clear()
+        self.nouns_in_paragraph.clear()
+
         ui.textEdit.setHtml(
             self.html + "<b>Welcome to PCG adventures!</b>" + self.html_end)
 
@@ -378,9 +403,9 @@ class InteractiveStoryUI(object):
 
         # 3. Load/generate introduction [Place, Time, Crew, Items]
         # -> place items in first place.
-        self.setting_id = random.randrange(0, len(settings["fantasy"].introductions)-1)
+        self.setting_id = random.randrange(0, len(settings["harry potter"].introductions))
         self.setting_id = 0 # temporary
-        self.paragraph = settings["fantasy"].introductions[self.setting_id]
+        self.paragraph = settings["harry potter"].introductions[self.setting_id]
 
         if self.paragraph_count < self.paragraphs:
 
@@ -399,14 +424,14 @@ class InteractiveStoryUI(object):
             self.html_paragraph = self.highlightEntities(self.html_paragraph)
 
             # append paragraph
-            self.text = self.text + self.paragraph
+            self.text = self.text + " " + self.paragraph
 
             # highlight player name
             self.html_paragraph = self.html_paragraph.replace(self.name, "<b>" + self.name + "</b>")
 
             # append html and highlight
-            temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
-            self.html = self.html + self.html_paragraph
+            temp_html = self.html + " <span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
+            self.html = self.html + " " + self.html_paragraph
             ui.textEdit.setHtml(temp_html + self.html_end)
 
             # 11. Increase paragraph counter
