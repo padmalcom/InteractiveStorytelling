@@ -12,6 +12,9 @@ from actiontemplates import ActionTemplates
 from nltk.corpus import wordnet as wn
 import nltk
 from nltk import ngrams
+from nltk.corpus import reuters
+from nltk import bigrams, trigrams
+from collections import Counter, defaultdict
 
 # pyqt5
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -132,13 +135,51 @@ class InteractiveStoryUI(object):
         self.MAX_ACTIONS = 18
         self.actionTemplates = ActionTemplates()
         self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"]
+        self.bigramModel = None
+        self.trigramModel = None
 
         # gpt adventure
         self.STRICT_MODE = True
         self.alreadyDone = ""
         self.locContext = ""
 
-        #nltk.download('wordnet')
+        try:
+            nltk.data.find('tokenizers/wordnet')
+        except LookupError:
+            nltk.download('wordnet')
+
+        try:
+            nltk.data.find('tokenizers/reuters')
+        except LookupError:
+            nltk.download('reuters')
+
+        self.buildModels()
+
+    def buildModels(self):
+        #https://www.analyticsvidhya.com/blog/2019/08/comprehensive-guide-language-model-nlp-python-code/
+        print("Building ngram models...")
+        # Create a placeholder for model
+        self.bigramModel = defaultdict(lambda: defaultdict(lambda: 0))
+        self.trigramModel = defaultdict(lambda: defaultdict(lambda: 0))
+
+        # Count frequency of co-occurance  
+        for sentence in reuters.sents():
+            for w1, w2, w3 in trigrams(sentence, pad_right=True, pad_left=True):
+                self.trigramModel[(w1, w2)][w3] += 1
+            for w1, w2 in bigrams(sentence, pad_right=True, pad_left=True):
+                self.bigramModel[(w1)][w2] += 1
+        
+        # Let's transform the counts to probabilities
+        for w1_w2 in self.trigramModel:
+            total_count = float(sum(self.trigramModel[w1_w2].values()))
+            for w3 in self.trigramModel[w1_w2]:
+                self.trigramModel[w1_w2][w3] /= total_count
+
+        for w1 in self.bigramModel:
+            total_count = float(sum(self.bigramModel[w1].values()))
+            for w2 in self.bigramModel[w1]:
+                self.bigramModel[w1][w2] /= total_count
+        print("Done building models")
 
     def getSentiment(self, text):
         analysis = TextBlob(text) 
