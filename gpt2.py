@@ -67,18 +67,25 @@ class GPT2:
                 result.append(generated)
         return result
 
-    def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.n_gpu = torch.cuda.device_count()
-        self.set_seed(42, self.n_gpu)
-        self.num_samples = 1
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-large")
-        self.model = GPT2LMHeadModel.from_pretrained("gpt2-large")
-        self.model.to(self.device)
-        self.model.eval()
-        self.temperature = 1.0
+    def __init__(self, dummy=False):
+        if not dummy:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.n_gpu = torch.cuda.device_count()
+            self.set_seed(42, self.n_gpu)
+            self.num_samples = 1
+            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-large")
+            self.model = GPT2LMHeadModel.from_pretrained("gpt2-large")
+            self.model.to(self.device)
+            self.model.eval()
+            self.temperature = 1.0
+            self.is_dummy = False
+        else:
+            self.is_dummy = True
 
     def generate_texts(self, prefix, length, num_samples):
+
+        if self.is_dummy:
+            return ["This is a dummy text."]
 
         context_tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
 

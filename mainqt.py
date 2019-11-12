@@ -1,19 +1,9 @@
 from item import items
 from combination import combinations
-from setting import settings
 from functools import partial
 import random
-import spacy
-import en_core_web_lg
-from gpt2 import GPT2
-from textblob import TextBlob
 import os
-from actiontemplates import ActionTemplates
-from nltk.corpus import wordnet as wn
-import nltk
-from nltk import ngrams
-from nltk.corpus import reuters
-from nltk import bigrams, trigrams
+from storygenerator import StoryGenerator
 from collections import Counter, defaultdict
 
 # pyqt5
@@ -43,8 +33,6 @@ class InteractiveStoryUI(object):
         self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
         self.comboBox = QtWidgets.QComboBox(self.frame)
         self.comboBox.setObjectName("comboBox")
-        self.comboBox.addItem("")
-        self.comboBox.addItem("")
         self.gridLayout.addWidget(self.comboBox, 0, 1, 1, 1)
         self.label_3 = QtWidgets.QLabel(self.frame)
         self.label_3.setObjectName("label_3")
@@ -88,7 +76,6 @@ class InteractiveStoryUI(object):
         self.groupBox_2GridLayout = QtWidgets.QGridLayout(self.groupBox_2)
         self.gridLayout_2.addWidget(self.groupBox_2, 0, 1, 1, 1)
         self.verticalLayout.addWidget(self.frame_2)
-
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
@@ -97,139 +84,37 @@ class InteractiveStoryUI(object):
         Dialog.setWindowTitle(_translate("Dialog", "Interactive Storytelling"))
         self.label.setText(_translate("Dialog", "Setting:"))
 
-        allSettings = list(settings.keys())
-        for i,s in enumerate(allSettings):
-            self.comboBox.setItemText(i, _translate("Dialog", s))
+        allSettings = list(self.storyGenerator.getSettings().keys())
+        for s in allSettings:
+            self.comboBox.addItem(_translate("Dialog", s))
         self.label_3.setText(_translate("Dialog", "Player name:"))
         self.pushButton_2.setText(_translate("Dialog", "Start game"))
         self.label_2.setText(_translate("Dialog", "Paragraphs:"))
         self.pushButton.setText(_translate("Dialog", "Quit"))
-        self.textEdit.setHtml(_translate("Dialog", self.html + self.html_end))
+        self.textEdit.setHtml(_translate("Dialog", self.storyGenerator.html + self.storyGenerator.HTML_END))
         self.groupBox.setTitle(_translate("Dialog", "Actions"))
         self.groupBox_2.setTitle(_translate("Dialog", "Inventory"))
         self.lineEdit.setText(_translate("Dialog", "Jim"))
-        self.spinBox.setValue(4)
+        self.spinBox.setValue(self.storyGenerator.paragraphs)
 
     def __init__(self):
         super().__init__()
-        self.inventory = []
-        self.known_places = []
-        self.known_people = []
-        self.nlp = spacy.load("en_core_web_lg")
-        self.introduction = ""
-        self.items_in_paragraph = []
-        self.places_in_paragraph = []
-        self.people_in_paragraph = []
-        self.events_in_paragraph = []
-        self.nouns_in_paragraph = []
-        self.paragraph_count = 0
-        self.name = ""
-        self.setting = ""
-        self.setting_id = 0
-        self.text = ""
-        self.html = "<html><body>"
-        self.html_end = "</body></html>"
+        self.storyGenerator = StoryGenerator()
         self.action_buttons = []
-        self.gpt2 = GPT2()
-        self.USE_NOUNS = True
-        self.MAX_ACTIONS = 18
-        self.actionTemplates = ActionTemplates()
-        self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"]
-        self.bigramModel = None
-        self.trigramModel = None
+        self.inventory_labels = []
 
-        # gpt adventure
-        self.STRICT_MODE = True
-        self.alreadyDone = ""
-        self.locContext = ""
-
-        try:
-            nltk.data.find('tokenizers/wordnet')
-        except LookupError:
-            nltk.download('wordnet')
-
-        try:
-            nltk.data.find('tokenizers/reuters')
-        except LookupError:
-            nltk.download('reuters')
-
-        self.buildModels()
-
-    def buildModels(self):
-        #https://www.analyticsvidhya.com/blog/2019/08/comprehensive-guide-language-model-nlp-python-code/
-        print("Building ngram models...")
-        # Create a placeholder for model
-        self.bigramModel = defaultdict(lambda: defaultdict(lambda: 0))
-        self.trigramModel = defaultdict(lambda: defaultdict(lambda: 0))
-
-        # Count frequency of co-occurance  
-        for sentence in reuters.sents():
-            for w1, w2, w3 in trigrams(sentence, pad_right=True, pad_left=True):
-                self.trigramModel[(w1, w2)][w3] += 1
-            for w1, w2 in bigrams(sentence, pad_right=True, pad_left=True):
-                self.bigramModel[(w1)][w2] += 1
-        
-        # Let's transform the counts to probabilities
-        for w1_w2 in self.trigramModel:
-            total_count = float(sum(self.trigramModel[w1_w2].values()))
-            for w3 in self.trigramModel[w1_w2]:
-                self.trigramModel[w1_w2][w3] /= total_count
-
-        for w1 in self.bigramModel:
-            total_count = float(sum(self.bigramModel[w1].values()))
-            for w2 in self.bigramModel[w1]:
-                self.bigramModel[w1][w2] /= total_count
-        print("Done building models")
-
-    def getSentiment(self, text):
-        analysis = TextBlob(text) 
-        # set sentiment 
-        if analysis.sentiment.polarity > 0: 
-            return 'positive'
-        elif analysis.sentiment.polarity == 0: 
-            return 'neutral'
-        else: 
-            return 'negative'
-
-    def splitSentences(self, textExtract, allowIncomplete=False):
-        nlp2 = spacy.load("en_core_web_lg")
-        nlp2.add_pipe(nlp2.create_pipe('sentencizer'), first=True)
-        doc = nlp2(textExtract)
-        sentences = [sent.string.strip() for sent in doc.sents]
-        # Check completion
-        result = []
-        for sentence in sentences:
-            doc = nlp2(sentence)
-            if doc[len(doc)-1].is_punct or allowIncomplete:
-                result.append(sentence)
-        return result
-
-    def trucateLastSentences(self, textExtract, characters):
-        sentences = self.splitSentences(textExtract, False)
-        result = ""
-        for sentence in reversed(sentences):
-            if (len(result) > characters):
-                return result
-            else:
-                result = sentence + " " + result
-        return result
-
-
-    def generateText(self, history):
-        text = self.gpt2.generate_text(history, 100)
-        sentences = self.splitSentences(text, False)
-        return " ".join(sentences)
-
-    def generateEnd(self):
-        ending_text = settings["harry potter"].endings[self.setting_id]
-        ending_text = ending_text.replace("[name]", self.name)
-        html_ending = self.highlightEntities(ending_text)
-        html_ending = html_ending.replace(self.name, "<b>" + self.name + "</b>")
-
-        self.text = self.text + ending_text
-        temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + html_ending + "</span>"        
-        self.html = self.html + html_ending
-        ui.textEdit.setHtml(temp_html + self.html_end)
+    def reset(self):
+        self.storyGenerator.reset()
+        for button in self.action_buttons:
+            self.groupBoxGridLayout.removeWidget(button)
+            button.deleteLater()
+            button = None
+        self.action_buttons.clear()
+        for label in self.inventory_labels:
+            self.groupBox_2GridLayout.removeWidget(label)
+            label.deleteLater()
+            button = None
+        self.inventory_labels.clear()
 
     def clickAction(self, action, entity):
 
@@ -238,99 +123,62 @@ class InteractiveStoryUI(object):
             action_sentence = ""
         else:
             # Select action template
-            action_sentence = self.actionTemplates.getTemplate(action, self.name, entity)
+            action_sentence = self.storyGenerator.getActionTemplates(action, entity)
 
-        if self.paragraph_count < self.paragraphs:
+        # add to inventory
+        if action == "take": # and not entity in self.storyGenerator.inventory
+            # todo: check if take was a success
+            self.storyGenerator.inventory.append(entity)
+            self.inventory_labels.append(QtWidgets.QLabel(self.groupBox_2))
+            self.inventory_labels[-1].setText(entity)
+            self.groupBox_2GridLayout.addWidget(self.inventory_labels[-1], (len(self.inventory_labels)-1) // 3, (len(self.inventory_labels)-1) % 3)
+        elif action == "use from inventory":
+            self.storyGenerator.inventory.remove(entity)
+            # delete label
+            for label in self.inventory_labels:
+                if label.text == entity:
+                    self.groupBox_2GridLayout.removeWidget(label)
+                    label.deleteLater()
+                    self.inventory_labels.remove(label)
+                    break
+                    #label = None
 
-            self.text = self.text + " " + action_sentence
+        if self.storyGenerator.current_paragraphs < self.storyGenerator.paragraphs:
+
+            self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence
 
             # generate next paragraph
-            trucated_text = self.trucateLastSentences(self.text, 200)
-            new_text = self.generateText(trucated_text)
-            self.paragraph = action_sentence + " " + new_text
+            trucated_text = self.storyGenerator.truncateLastSentences(200)
+            new_text = self.storyGenerator.generateText(trucated_text)
+            self.storyGenerator.paragraph = action_sentence + " " + new_text
 
             # extract entities
-            self.extractEntities()
+            self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
 
-            self.html_paragraph = self.paragraph
+            self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
 
             # 5.1 Clean up buttons
             self.createButtons()
 
             # highlight player name
-            self.html_paragraph = self.highlightEntities(self.html_paragraph)
-            self.html_paragraph = self.html_paragraph.replace(self.name, "<b>" + self.name + "</b>")
+            self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
+            self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
 
             # append html and text
-            self.text = self.text + " " + self.paragraph
-            temp_html = self.html + " <span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
-            self.html = self.html + " " + self.html_paragraph
-            ui.textEdit.setHtml(temp_html + self.html_end)
+            self.storyGenerator.text = self.storyGenerator.text + " " + self.storyGenerator.paragraph
+            temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
+            self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
+            ui.textEdit.setHtml(temp_html + self.storyGenerator.HTML_END)
 
-            self.paragraph_count +=1
+            self.storyGenerator.current_paragraphs +=1
         else:
-            self.generateEnd()
-
-    def extractEntities(self):
-        # 4. NLP on paragraph [Extract People, Places, Items]
-        doc = self.nlp(self.paragraph)
-
-        # 4.1 clear entities before extraction
-        self.people_in_paragraph.clear()
-        self.places_in_paragraph.clear()
-        self.events_in_paragraph.clear()
-        self.items_in_paragraph.clear()
-        self.nouns_in_paragraph.clear()
-
-        # 4.2 extract each entity
-        for ent in doc.ents:
-            if ent.label_ == "PERSON" and ent.text != self.name and not ent.text in self.people_in_paragraph:
-                self.people_in_paragraph.append(ent.text)
-            elif (ent.label_ == "GPE" or ent.label_ == "LOC") and not ent.text in self.places_in_paragraph:
-                self.places_in_paragraph.append(ent.text)
-            elif ent.label_ == "EVENT" and not ent.text in self.events_in_paragraph:  # talk about event
-                self.events_in_paragraph.append(ent.text)
-            elif ent.label_ == "PRODUCT" and not ent.text in self.items_in_paragraph:
-                self.items_in_paragraph.append(ent.text)
-
-        # Extract nouns
-        if (self.USE_NOUNS):
-            for token in doc:
-                if token.pos_ == 'NOUN':
-
-                    # Only allow man made objects
-                    for synset in wn.synsets(token.text):
-                        if ((synset.lexname() in self.acceptedNouns) and (not token.text in self.nouns_in_paragraph)):
-                            print("type: " + synset.lexname() + " value: " + token.text)
-                            self.nouns_in_paragraph.append(token.text)
-
-    def highlightEntities(self, text):
-        for person in self.people_in_paragraph:
-            text = text.replace(person, "<b><font color=\"red\">" + person + "</font></b>")
-        for place in self.places_in_paragraph:
-            text = text.replace(place, "<b><font color=\"green\">" + place + "</font></b>")
-        for event in self.events_in_paragraph:
-            text = text.replace(event, "<b><font color=\"yellow\">" + event + "</font></b>")
-        for item in self.items_in_paragraph:
-            text = text.replace(item, "<b><font color=\"purple\">" + item + "</font></b>")
-
-        if (self.USE_NOUNS):
-            for noun in self.nouns_in_paragraph:
-                text = text.replace(noun, "<b><font color=\"blue\">" + noun + "</font></b>")
-        return text
+            self.storyGenerator.generateEnd()
 
     def createButtons(self):
 
         # Todo rate ngrams
         # https://stackoverflow.com/questions/54962539/how-to-get-the-probability-of-bigrams-in-a-text-of-sentences
         # https://stackoverflow.com/questions/6462709/nltk-language-model-ngram-calculate-the-prob-of-a-word-from-context
-        sequence = nltk.tokenize.word_tokenize("Take shirt") 
-        bigram = ngrams(sequence,2)
-        freq_dist = nltk.FreqDist(bigram)
-        prob_dist = nltk.MLEProbDist(freq_dist)
-        number_of_bigrams = freq_dist.N()
-        print ("Probability of take shirt: " + str(prob_dist) + " number: " + str(number_of_bigrams))
-
 
         # 5.2 Are there any buttons? Destroy
         for button in self.action_buttons:
@@ -340,17 +188,17 @@ class InteractiveStoryUI(object):
         self.action_buttons.clear()
 
         # 5.3 Check if there are any actions
-        if (len(self.people_in_paragraph) > 0 or len(self.places_in_paragraph) > 0 or
-            len(self.events_in_paragraph) > 0 or len(self.items_in_paragraph) > 0 or
-            (len(self.nouns_in_paragraph) > 0 and self.USE_NOUNS)):
+        if (len(self.storyGenerator.people_in_paragraph) > 0 or len(self.storyGenerator.places_in_paragraph) > 0 or
+            len(self.storyGenerator.events_in_paragraph) > 0 or len(self.storyGenerator.items_in_paragraph) > 0 or
+            (len(self.storyGenerator.nouns_in_paragraph) > 0 and self.storyGenerator.USE_NOUNS)):
 
             # 6. Generate actions [Talk to, Take [item] {based on nlp}, go to [Place], Inspect [Item, Place, Person, Item in inventory], Push, Pull {fun?},
             # insult/compliment [Person], use [item], combine [item, item]]
             action_count = 0
-            for person in self.people_in_paragraph:
+            for person in self.storyGenerator.people_in_paragraph:
                 actions = ["compliment", "insult", "look at", "who are you,"]
                 for action in actions:
-                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
                         break
                     else:
                         self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
@@ -360,10 +208,10 @@ class InteractiveStoryUI(object):
                         self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, person))
                         action_count +=1
 
-            for place in self.places_in_paragraph:
+            for place in self.storyGenerator.places_in_paragraph:
                 actions = ["go to", "look at"]
                 for action in actions:
-                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
                         break
                     else:                    
                         self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
@@ -373,10 +221,10 @@ class InteractiveStoryUI(object):
                         self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, place))
                         action_count +=1
 
-            for event in self.events_in_paragraph:
+            for event in self.storyGenerator.events_in_paragraph:
                 actions = ["think about"]
                 for action in actions:
-                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
                         break
                     else:
                         self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
@@ -386,24 +234,35 @@ class InteractiveStoryUI(object):
                         self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, event))
                         action_count +=1
 
-            for item in self.items_in_paragraph:
+            for item in self.storyGenerator.items_in_paragraph:
                 actions = ["take", "use", "push"]
                 for action in actions:
-                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
                         break
                     else:
                         self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
                         self.action_buttons[-1].setText(action + " " + item)
                         self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                        self.action_buttons[-1].setToolTip(action + " " + item)                    
+                        self.action_buttons[-1].setToolTip(action + " " + item)
                         self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, item))
                         action_count +=1
 
-            if (self.USE_NOUNS):
-                for noun in self.nouns_in_paragraph:
+            for item in self.storyGenerator.inventory:
+                if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
+                    break
+                else:
+                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+                    self.action_buttons[-1].setText("use " + item + " from inventory")
+                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+                    self.action_buttons[-1].setToolTip("use " + item + " from inventory")
+                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, "use from inventory", item))
+                    action_count +=1
+
+            if (self.storyGenerator.USE_NOUNS):
+                for noun in self.storyGenerator.nouns_in_paragraph:
                     actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
                     for action in actions:
-                        if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                        if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
                             break
                         else:
                             self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
@@ -422,64 +281,64 @@ class InteractiveStoryUI(object):
         self.action_buttons[-1].clicked.connect(partial(self.clickAction, "", ""))
 
     def startNewGame(self):
-        self.html = ""
-        self.html_paragraph = ""
-        self.paragraph = ""
-        self.paragraph_count = 0
-        self.people_in_paragraph.clear()
-        self.places_in_paragraph.clear()
-        self.events_in_paragraph.clear()
-        self.items_in_paragraph.clear()
-        self.nouns_in_paragraph.clear()
+        self.storyGenerator.html = ""
+        self.storyGenerator.html_paragraph = ""
+        self.storyGenerator.paragraph = ""
+        self.storyGenerator.current_paragraphs = 0
+        self.storyGenerator.people_in_paragraph.clear()
+        self.storyGenerator.places_in_paragraph.clear()
+        self.storyGenerator.events_in_paragraph.clear()
+        self.storyGenerator.items_in_paragraph.clear()
+        self.storyGenerator.nouns_in_paragraph.clear()
 
         ui.textEdit.setHtml(
-            self.html + "<b>Welcome to PCG adventures!</b>" + self.html_end)
+            self.storyGenerator.html + "<b>Welcome to PCG adventures!</b>" + self.storyGenerator.HTML_END)
 
         # 1. Enter name and story length [# of paragraphs]
-        self.name = self.lineEdit.text()
-        self.paragraphs = self.spinBox.value()
+        self.storyGenerator.name = self.lineEdit.text()
+        self.storyGenerator.paragraphs = self.spinBox.value()
 
         # 2. Select setting [middle age, fantasy, horror]
-        self.setting = self.comboBox.currentText()
+        self.storyGenerator.setting = self.comboBox.currentText()
 
         # 3. Load/generate introduction [Place, Time, Crew, Items]
         # -> place items in first place.
-        self.setting_id = random.randrange(0, len(settings["harry potter"].introductions))
-        self.setting_id = 0 # temporary
-        self.paragraph = settings["harry potter"].introductions[self.setting_id]
+        self.storyGenerator.setting_id = random.randrange(0, len(self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions))
+        self.storyGenerator.setting_id = 0 # temporary
+        self.storyGenerator.paragraph = self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions[self.storyGenerator.setting_id]
 
-        if self.paragraph_count < self.paragraphs:
+        if self.storyGenerator.current_paragraphs < self.storyGenerator.paragraphs:
 
             # Replace [name]
-            self.paragraph = self.paragraph.replace("[name]", self.name)
+            self.storyGenerator.paragraph = self.storyGenerator.paragraph.replace("[name]", self.storyGenerator.name)
 
-            self.extractEntities()
+            self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
 
             # temporary element to be appended to html and text
-            self.html_paragraph = self.paragraph
+            self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
 
             # 5.1 Clean up buttons and create new
             self.createButtons()
 
             # Highlight entities
-            self.html_paragraph = self.highlightEntities(self.html_paragraph)
+            self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
 
             # append paragraph
-            self.text = self.text + " " + self.paragraph
+            self.storyGenerator.text = self.storyGenerator.text + " " + self.storyGenerator.paragraph
 
             # highlight player name
-            self.html_paragraph = self.html_paragraph.replace(self.name, "<b>" + self.name + "</b>")
+            self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
 
             # append html and highlight
-            temp_html = self.html + " <span style=\"background-color: #FFFF00\">" + self.html_paragraph + "</span>"
-            self.html = self.html + " " + self.html_paragraph
-            ui.textEdit.setHtml(temp_html + self.html_end)
+            temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
+            self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
+            ui.textEdit.setHtml(temp_html + self.storyGenerator.HTML_END)
 
             # 11. Increase paragraph counter
-            self.paragraph_count += 1
+            self.storyGenerator.current_paragraphs += 1
 
         else:
-            self.generateEnd()
+            self.storyGenerator.generateEnd()
 
 
 if __name__ == '__main__':

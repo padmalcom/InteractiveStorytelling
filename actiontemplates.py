@@ -18,5 +18,6 @@ actiontemplates = {
      "pull":["With only two fingers [name] pulled the [object].", "The [object] didn't say pull, but [name] pulled."],
      "open":["Carefully, [name] opened the [object]."],
      "close":["With a smash, [name] closed the [object]."],
-     "talk to":["[name] decided to talk to [object].", "\"Hey, [object], I want to talk\", said [name]."]
+     "talk to":["[name] decided to talk to [object].", "\"Hey, [object], I want to talk\", said [name]."],
+     "use from inventory":["[name] used the [object] from the inventory.", "[name] pulled out the [object] from the bag and used it."]
 }
