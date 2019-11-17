@@ -177,8 +177,7 @@ class InteractiveStoryUI(object):
     def createButtons(self):
 
         # Todo rate ngrams
-        # https://stackoverflow.com/questions/54962539/how-to-get-the-probability-of-bigrams-in-a-text-of-sentences
-        # https://stackoverflow.com/questions/6462709/nltk-language-model-ngram-calculate-the-prob-of-a-word-from-context
+        self.storyGenerator.generateActions()
 
         # 5.2 Are there any buttons? Destroy
         for button in self.action_buttons:

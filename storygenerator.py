@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+import operator
 
 # nlp
 import spacy
@@ -40,7 +41,7 @@ class StoryGenerator():
         self.USE_NOUNS = True
         self.MAX_ACTIONS = 18
         self.actionTemplates = ActionTemplates()
-        self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"]
+        self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"] 
         self.bigramModel = None
         self.trigramModel = None
         self.paragraph = ""
@@ -56,7 +57,7 @@ class StoryGenerator():
         except LookupError:
             nltk.download('reuters')
 
-        self.buildModels()
+        self.__buildNGramModels__()
 
     def reset(self):
         self.inventory.clear()
@@ -84,7 +85,7 @@ class StoryGenerator():
     def getActionTemplates(self, action, entity):
         return self.actionTemplates.getTemplate(action, self.name, entity)
 
-    def buildModels(self):
+    def __buildNGramModels__(self):
         #https://www.analyticsvidhya.com/blog/2019/08/comprehensive-guide-language-model-nlp-python-code/
         print("Building ngram models...")
         # Create a placeholder for model
@@ -109,6 +110,33 @@ class StoryGenerator():
             for w2 in self.bigramModel[w1]:
                 self.bigramModel[w1][w2] /= total_count
         print("Done building models")
+
+    def getProbability(self, sentence):
+        doc = self.nlp(sentence)
+        words = [token.text for token in doc if token.is_punct != True]
+        if (len(words) < 2 or (len(words) > 3)):
+            print("Ngram probability only supports 2 or 3 words.")
+            return 0.0
+        else:
+            if (len(words) == 2):
+                return self.getProbabilityBigram(words[0], words[1])
+            else:
+                return self.getProbabilityTrigram(words[0], words[1], words[2])
+        return 0.0
+
+    def getProbabilityBigram(self, word1, word2):
+        bigramDict = dict(self.bigramModel[word1])
+        if word2 in bigramDict:
+            return bigramDict[word2]
+        else:
+            return 0.0
+
+    def getProbabilityTrigram(self, word1, word2, word3):
+        trigramDict = dict(self.trigramModel[word1, word2])
+        if word3 in trigramDict:
+            return trigramDict[word3]
+        else:
+            return 0.0
 
     def getSentiment(self, text):
         analysis = TextBlob(text) 
@@ -171,16 +199,25 @@ class StoryGenerator():
         self.items_in_paragraph.clear()
         self.nouns_in_paragraph.clear()
 
+        entity_ids = {}
+
         # 4.2 extract each entity
         for ent in doc.ents:
-            if ent.label_ == "PERSON" and ent.text != self.name and not ent.text in self.people_in_paragraph:
+            if (ent.kb_id_ in entity_ids.keys()):
+                print("Will not add entity " + ent.text + " because it is similar to " + entity_ids[ent.kb_id_] + ".")
+
+            if (ent.label_ == "PERSON") and (ent.text != self.name) and (not ent.text in self.people_in_paragraph):
                 self.people_in_paragraph.append(ent.text)
-            elif (ent.label_ == "GPE" or ent.label_ == "LOC") and not ent.text in self.places_in_paragraph:
-                self.places_in_paragraph.append(ent.text)
-            elif ent.label_ == "EVENT" and not ent.text in self.events_in_paragraph:  # talk about event
+                entity_ids[ent.kb_id_] = ent.text                    
+            elif (ent.label_ == "GPE" or ent.label_ == "LOC") and (not ent.text in self.places_in_paragraph):
+                self.places_in_paragraph.append(ent.text)  
+                entity_ids[ent.kb_id_] = ent.text          
+            elif (ent.label_ == "EVENT") and (not ent.text in self.events_in_paragraph):  # talk about event
                 self.events_in_paragraph.append(ent.text)
-            elif ent.label_ == "PRODUCT" and not ent.text in self.items_in_paragraph:
+                entity_ids[ent.kb_id_] = ent.text
+            elif (ent.label_ == "PRODUCT") and (not ent.text in self.items_in_paragraph):
                 self.items_in_paragraph.append(ent.text)
+                entity_ids[ent.kb_id_] = ent.text
 
         # Extract nouns
         if (self.USE_NOUNS):
@@ -208,3 +245,65 @@ class StoryGenerator():
             for noun in self.nouns_in_paragraph:
                 text = text.replace(noun, "<b><font color=\"blue\">" + noun + "</font></b>")
         return text
+
+    def generateActions(self):
+        all_actions = {}
+        action_count = 0
+
+        for person in self.people_in_paragraph:
+            actions = ["compliment", "insult", "look at", "who are you,"]
+            for action in actions:
+                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    break
+                else:
+                    probability = self.getProbability(action + " " + person)
+                    all_actions[action + " " + person] = {"type":"person", "action":action, "entity":person, "probability":probability}
+
+        for place in self.places_in_paragraph:
+            actions = ["go to", "look at"]
+            for action in actions:
+                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    break
+                else:                    
+                    probability = self.getProbability(action + " " + place)
+                    all_actions[action + " " + place] = {"type":"place", "action":action, "entity":place, "probability":probability}
+
+        for event in self.events_in_paragraph:
+            actions = ["think about"]
+            for action in actions:
+                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    break
+                else:
+                    probability = self.getProbability(action + " " + event)
+                    all_actions[action + " " + event] = {"type":"event", "action":action, "entity":event, "probability":probability}
+
+        for item in self.items_in_paragraph:
+            actions = ["take", "use", "push"]
+            for action in actions:
+                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                    break
+                else:
+                    probability = self.getProbability(action + " " + item)
+                    all_actions[action + " " + item] = {"type":"item", "action":action, "entity":item, "probability":probability}
+
+        for item in self.inventory:
+            if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                break
+            else:
+                probability = self.getProbability("use " + item)
+                all_actions["use " + item] = {"type":"item_from_inventory", "action":action, "entity":item, "probability":probability}
+
+        if (self.USE_NOUNS):
+            for noun in self.nouns_in_paragraph:
+                actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
+                for action in actions:
+                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
+                        break
+                    else:
+                        probability = self.getProbability(action + " " + noun)
+                        all_actions[action + " " + noun] = {"type":"noun", "action":action, "entity":noun, "probability":probability}
+        
+        print("Found " + str(len(all_actions)) + " actions.")
+        sorted_actions = sorted(all_actions.values(), key=operator.attrgetter("probability"))
+        for a in sorted_actions:
+            print(a)
