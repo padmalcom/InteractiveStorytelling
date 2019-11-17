@@ -106,3 +106,21 @@ class GPT2:
             return texts[0]
         else:
             return ""
+
+    def score_probability(self, sentence):
+        #input_ids = torch.tensor(self.tokenizer.encode(sentence)).unsqueeze(0)  # Batch size 1
+        tokenize_input = self.tokenizer.tokenize(sentence)
+        tensor_input = torch.tensor([ [self.tokenizer.eos_token_id]  +  self.tokenizer.convert_tokens_to_ids(tokenize_input)])
+        with torch.no_grad():
+            outputs = self.model(tensor_input, labels=tensor_input)
+            loss, logits = outputs[:2]
+        print("a=", loss*len(tokenize_input))
+
+        """ lp = 0.0
+        for i in range(len(tokenize_input)):
+            masked_index = i
+            predicted_score = logits[0, masked_index]
+            predicted_prob = torch.nn.softmax(np.array(predicted_score))
+            lp += np.log(predicted_prob[self.tokenizer.convert_tokens_to_ids([tokenize_input[i]])[0]])
+
+        print("b=", lp) """

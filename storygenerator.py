@@ -5,8 +5,8 @@ import operator
 import spacy
 import en_core_web_lg
 import nltk
-from nltk import ngrams
-from nltk.corpus import reuters
+#from nltk import ngrams
+from nltk.corpus import brown
 from nltk import bigrams, trigrams
 from nltk.corpus import wordnet as wn
 from textblob import TextBlob
@@ -53,9 +53,9 @@ class StoryGenerator():
             nltk.download('wordnet')
 
         try:
-            nltk.data.find('tokenizers/reuters')
+            nltk.data.find('tokenizers/brown')
         except LookupError:
-            nltk.download('reuters')
+            nltk.download('brown')
 
         self.__buildNGramModels__()
 
@@ -93,7 +93,7 @@ class StoryGenerator():
         self.trigramModel = defaultdict(lambda: defaultdict(lambda: 0))
 
         # Count frequency of co-occurance  
-        for sentence in reuters.sents():
+        for sentence in brown.sents():
             for w1, w2, w3 in trigrams(sentence, pad_right=True, pad_left=True):
                 self.trigramModel[(w1, w2)][w3] += 1
             for w1, w2 in bigrams(sentence, pad_right=True, pad_left=True):
@@ -115,18 +115,23 @@ class StoryGenerator():
         doc = self.nlp(sentence)
         words = [token.text for token in doc if token.is_punct != True]
         if (len(words) < 2 or (len(words) > 3)):
-            print("Ngram probability only supports 2 or 3 words.")
+            print("Ngram probability only supports 2 or 3 words. You entered " + str(len(words)) + "('" + sentence + "').")
             return 0.0
         else:
             if (len(words) == 2):
-                return self.getProbabilityBigram(words[0], words[1])
+                prob = self.getProbabilityBigram(words[0], words[1])
+                print("Bigram prob of " + sentence + " is: " + str(prob))
+                return prob
             else:
-                return self.getProbabilityTrigram(words[0], words[1], words[2])
+                prob = self.getProbabilityTrigram(words[0], words[1], words[2])
+                print("Trigram prob of " + sentence + " is: " + str(prob))
+                return prob
         return 0.0
 
     def getProbabilityBigram(self, word1, word2):
         bigramDict = dict(self.bigramModel[word1])
         if word2 in bigramDict:
+            print("Here2")
             return bigramDict[word2]
         else:
             return 0.0
@@ -134,6 +139,7 @@ class StoryGenerator():
     def getProbabilityTrigram(self, word1, word2, word3):
         trigramDict = dict(self.trigramModel[word1, word2])
         if word3 in trigramDict:
+            print("Here3")
             return trigramDict[word3]
         else:
             return 0.0
@@ -304,6 +310,6 @@ class StoryGenerator():
                         all_actions[action + " " + noun] = {"type":"noun", "action":action, "entity":noun, "probability":probability}
         
         print("Found " + str(len(all_actions)) + " actions.")
-        sorted_actions = sorted(all_actions.values(), key=operator.attrgetter("probability"))
+        sorted_actions = sorted(all_actions.values(), key=operator.itemgetter("probability"))
         for a in sorted_actions:
             print(a)
