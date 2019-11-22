@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 from transformers import GPT2Config
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
+import math
 
 class GPT2:
 
@@ -107,20 +108,29 @@ class GPT2:
         else:
             return ""
 
+    # smaller result is more probable
     def score_probability(self, sentence):
-        #input_ids = torch.tensor(self.tokenizer.encode(sentence)).unsqueeze(0)  # Batch size 1
-        tokenize_input = self.tokenizer.tokenize(sentence)
+        # https://github.com/huggingface/transformers/issues/1009
+        """tokenize_input = self.tokenizer.tokenize(sentence)
         tensor_input = torch.tensor([ [self.tokenizer.eos_token_id]  +  self.tokenizer.convert_tokens_to_ids(tokenize_input)])
+        tensor_input = tensor_input.to(self.device)
         with torch.no_grad():
             outputs = self.model(tensor_input, labels=tensor_input)
-            loss, logits = outputs[:2]
-        print("a=", loss*len(tokenize_input))
+            _, logits = outputs[:2] # first parameter is loss
 
-        """ lp = 0.0
+        lp = 0.0
         for i in range(len(tokenize_input)):
             masked_index = i
-            predicted_score = logits[0, masked_index]
-            predicted_prob = torch.nn.softmax(np.array(predicted_score))
+            predicted_score = logits[0, masked_index].cpu()
+            #predicted_prob = F.softmax(np.array(predicted_score))
+            predicted_prob = F.softmax(predicted_score)
+            predicted_prob = np.array(predicted_prob)
             lp += np.log(predicted_prob[self.tokenizer.convert_tokens_to_ids([tokenize_input[i]])[0]])
+        return lp """
 
-        print("b=", lp) """
+        tokenize_input = self.tokenizer.tokenize(sentence)
+        tensor_input = torch.tensor([self.tokenizer.convert_tokens_to_ids(tokenize_input)])
+        tensor_input = tensor_input.to(self.device)
+        outputs = self.model(tensor_input, labels=tensor_input)
+        loss, logits = outputs[:2]
+        return math.exp(loss)

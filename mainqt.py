@@ -116,14 +116,14 @@ class InteractiveStoryUI(object):
             button = None
         self.inventory_labels.clear()
 
-    def clickAction(self, action, entity):
+    def clickAction(self, action, entity, action_sentence):
 
         # If no action is defined, just continue on the last text block.
-        if (action == "" and entity == ""):
-            action_sentence = ""
-        else:
+        #if (action == "" and entity == ""):
+        #    action_sentence = ""
+        #else:
             # Select action template
-            action_sentence = self.storyGenerator.getActionTemplates(action, entity)
+        #    action_sentence = self.storyGenerator.getActionTemplates(action, entity)
 
         # add to inventory
         if action == "take": # and not entity in self.storyGenerator.inventory
@@ -143,10 +143,33 @@ class InteractiveStoryUI(object):
                     break
                     #label = None
 
-        if self.storyGenerator.current_paragraphs < self.storyGenerator.paragraphs:
+        self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence
 
-            self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence
+        if self.storyGenerator.current_paragraphs >= self.storyGenerator.paragraphs:
+            end = self.storyGenerator.generateEnd()
+            self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence + " " + end
 
+            trucated_text = self.storyGenerator.truncateLastSentences(200)
+            new_text = self.storyGenerator.generateText(trucated_text)
+
+            self.storyGenerator.paragraph = new_text
+
+            # extract entities
+            self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
+
+            self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
+            
+            self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
+            self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+
+            # append html and text
+            self.storyGenerator.text = self.storyGenerator.text + self.storyGenerator.paragraph
+            temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
+            self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
+            ui.textEdit.setHtml(temp_html + "<br><b>THE END</b>" + self.storyGenerator.HTML_END)
+            
+
+        else:
             # generate next paragraph
             trucated_text = self.storyGenerator.truncateLastSentences(200)
             new_text = self.storyGenerator.generateText(trucated_text)
@@ -171,13 +194,8 @@ class InteractiveStoryUI(object):
             ui.textEdit.setHtml(temp_html + self.storyGenerator.HTML_END)
 
             self.storyGenerator.current_paragraphs +=1
-        else:
-            self.storyGenerator.generateEnd()
 
     def createButtons(self):
-
-        # Todo rate ngrams
-        self.storyGenerator.generateActions()
 
         # 5.2 Are there any buttons? Destroy
         for button in self.action_buttons:
@@ -186,8 +204,22 @@ class InteractiveStoryUI(object):
             button = None
         self.action_buttons.clear()
 
+        actions = self.storyGenerator.generateActions()
+
+        if (self.storyGenerator.MAX_ACTIONS > -1):
+            actions = actions[:self.storyGenerator.MAX_ACTIONS]
+
+        for action in actions:
+            # 6.2 Continue without taking an action 
+            print(action)
+            self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
+            self.action_buttons[-1].setText(action["action"] + " " + action["entity"])
+            self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
+            self.action_buttons[-1].setToolTip(action["sentence"])
+            self.action_buttons[-1].clicked.connect(partial(self.clickAction, action["action"], action["entity"], action["sentence"]))
+
         # 5.3 Check if there are any actions
-        if (len(self.storyGenerator.people_in_paragraph) > 0 or len(self.storyGenerator.places_in_paragraph) > 0 or
+        """if (len(self.storyGenerator.people_in_paragraph) > 0 or len(self.storyGenerator.places_in_paragraph) > 0 or
             len(self.storyGenerator.events_in_paragraph) > 0 or len(self.storyGenerator.items_in_paragraph) > 0 or
             (len(self.storyGenerator.nouns_in_paragraph) > 0 and self.storyGenerator.USE_NOUNS)):
 
@@ -269,7 +301,7 @@ class InteractiveStoryUI(object):
                             self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
                             self.action_buttons[-1].setToolTip(action + " " + noun)                    
                             self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, noun))
-                            action_count +=1
+                            action_count +=1"""
 
 
         # 6.2 Continue without taking an action 

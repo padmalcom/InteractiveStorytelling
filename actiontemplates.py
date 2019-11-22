@@ -3,7 +3,9 @@ import random
 class ActionTemplates:
     def getTemplate(self, action, player, entity):
         template = random.choice(actiontemplates[action])
-        return template.replace("[name]", player).replace("[object]", entity)
+        longaction = template.replace("[name]", player).replace("[object]", entity)
+        simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", entity)
+        return simpleaction, longaction
 
 actiontemplates = {
     "take" : ["Taking the [object] in both hands [name] stood there gratefully.", "[name] took the [object] with pride and smiled.", "Disgusted, [name] took the [object] from its place.", "[name] took the [object] without hesistation."],
@@ -20,4 +22,21 @@ actiontemplates = {
      "close":["With a smash, [name] closed the [object]."],
      "talk to":["[name] decided to talk to [object].", "\"Hey, [object], I want to talk\", said [name]."],
      "use from inventory":["[name] used the [object] from the inventory.", "[name] pulled out the [object] from the bag and used it."]
+}
+
+simpleactions = {
+    "take":"[name] takes the [object].",
+    "compliment":"[name] compliments [object].",
+    "insult":"[name] insults [object].",
+    "look at":"[name] looks at [object].",
+    "who are you,":"Who is [object]?",
+    "go to":"[name] goes to [object].",
+    "think about":"[name] thinks about [object].",
+    "use":"[name] uses the [object].",
+    "push":"[name] pushes the [object].",
+    "pull":"[name] pulls the [object].",
+    "open":"[name] opens the [object].",
+    "close":"[name] closes the [object].",
+    "talk to":"[name] talks to [object].",
+    "use from inventory":"[name] uses the [object]."
 }
