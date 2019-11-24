@@ -1,11 +1,11 @@
 from collections import Counter, defaultdict
 import operator
+import random
 
 # nlp
 import spacy
 import en_core_web_lg
 import nltk
-#from nltk import ngrams
 from nltk.corpus import brown
 from nltk import bigrams, trigrams
 from nltk.corpus import wordnet as wn
@@ -45,7 +45,8 @@ class StoryGenerator():
         self.bigramModel = None
         self.trigramModel = None
         self.paragraph = ""
-        self.paragraphs = 4
+        self.paragraphs = 6
+        self.CHANCE_TO_REMEMBER_ITEM = 1.0
 
         try:
             nltk.data.find('tokenizers/wordnet')
@@ -133,7 +134,13 @@ class StoryGenerator():
     def generateText(self, history):
         text = self.gpt2.generate_text(history, 100)
         sentences = self.splitSentences(text, False)
-        return " ".join(sentences)
+        # Add information about existing item
+        addinfo = ""
+        p = random.randint(0, 100) / 100.0
+        if p <= self.CHANCE_TO_REMEMBER_ITEM and len(self.inventory) > 0:
+            item = random.choice(self.inventory)
+            addinfo = "In that particular moment, " + self.name + " remembered he had a " + item + " in his pocket."
+        return " ".join(sentences) + " " + addinfo
 
     def generateEnd(self):
         print("End reached")
@@ -262,11 +269,11 @@ class StoryGenerator():
             if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
                 break
             else:
-                simple_action, action_sentence = self.getActionTemplates(action, item)
+                simple_action, action_sentence = self.getActionTemplates("use", item)
                 probability = self.getProbability(simple_action)
                 #probability = self.getProbability(action_sentence)
                 #probability = self.getVerbNounProbability(action, item)
-                all_actions["use " + item] = {"type":"item_from_inventory", "action":action, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+                all_actions["use " + item] = {"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability}
 
         if (self.USE_NOUNS):
             for noun in self.nouns_in_paragraph:

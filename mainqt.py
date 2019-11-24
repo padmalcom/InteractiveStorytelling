@@ -145,6 +145,7 @@ class InteractiveStoryUI(object):
 
         self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence
 
+        # Create an end
         if self.storyGenerator.current_paragraphs >= self.storyGenerator.paragraphs:
             end = self.storyGenerator.generateEnd()
             self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence + " " + end
@@ -168,7 +169,7 @@ class InteractiveStoryUI(object):
             self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
             ui.textEdit.setHtml(temp_html + "<br><b>THE END</b>" + self.storyGenerator.HTML_END)
             
-
+        # Create a normal paragraph
         else:
             # generate next paragraph
             trucated_text = self.storyGenerator.truncateLastSentences(200)
