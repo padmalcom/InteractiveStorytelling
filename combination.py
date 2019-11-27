@@ -3,14 +3,15 @@ from item import items
 class Combination:
     items = []
     returnItem = None
-    description = "Items have been combined."
+    action = ""
+    simple_action = ""
 
-    def __init__(self, items, returnItem, description):
+    def __init__(self, items, returnItem):
         self.items = items
         self.returnItem = returnItem
-        self.description = description
+        self.action = "[name] combined the " + ",".join([i.name for i in items[:-1]]) + " and the " + items[-1].name + " to receive a " + returnItem.description
 
 
 combinations = {
-    "saw_sword" : Combination([items["wood_plank"], items["saw"]], items["wooden_sword"], "It was easy to cut the wooden plank with the saw to a simple, wodden sword.")
+    "saw_sword" : Combination([items["plank"], items["saw"]], items["sword"])
 }

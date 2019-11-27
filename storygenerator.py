@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 import operator
 import random
+import sys
 
 # nlp
 import spacy
@@ -16,6 +17,7 @@ from gpt2 import GPT2
 from actiontemplates import ActionTemplates
 from item import items
 from setting import settings
+from combination import combinations
 
 class StoryGenerator():
 
@@ -47,6 +49,8 @@ class StoryGenerator():
         self.paragraph = ""
         self.paragraphs = 6
         self.CHANCE_TO_REMEMBER_ITEM = 1.0
+        self.PRIORIZE_ITEM_USAGE = True
+        self.PRIORIZE_COMBINATIONS = True
 
         try:
             nltk.data.find('tokenizers/wordnet')
@@ -215,79 +219,79 @@ class StoryGenerator():
 
     def generateActions(self):
         all_actions = {}
-        action_count = 0
+
+        for combination in combinations:
+            print(combination)
+            contains_all_items = all(elem in [i.name for i in combination.items] for elem in self.inventory)
+            if (contains_all_items):                 
+                simple_action = combination["action"]
+                probability = self.getProbability(simple_action)
+                if self.PRIORIZE_COMBINATIONS:
+                    probability = sys.float_info.max
+                #probability = self.getProbability(action_sentence)
+                #probability = self.getVerbNounProbability(action, place)
+                all_actions[combination.returnItem] = {"type":"combination", "action":simple_action, "entity":combination.returnItem, "sentence":simple_action, "simple": simple_action, "probability":probability}
+
+        for item in self.inventory:
+            simple_action, action_sentence = self.getActionTemplates("use", item)
+            probability = self.getProbability(simple_action)
+            if self.PRIORIZE_ITEM_USAGE:
+                probability = sys.float_info.max            
+            #probability = self.getProbability(action_sentence)
+            #probability = self.getVerbNounProbability(action, item)
+            all_actions["use " + item] = {"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+
 
         for person in self.people_in_paragraph:
             actions = ["compliment", "insult", "look at", "who are you,"]
             for action in actions:
-                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
-                    break
-                else:
-                    simple_action, action_sentence = self.getActionTemplates(action, person)
-                    probability = self.getProbability(simple_action)
-                    #probability = self.getProbability(action_sentence)
-                    #probability = self.getVerbNounProbability(action, person)
-                    all_actions[action + " " + person] = {"type":"person", "action":action, "entity":person, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+                simple_action, action_sentence = self.getActionTemplates(action, person)
+                probability = self.getProbability(simple_action)
+                #probability = self.getProbability(action_sentence)
+                #probability = self.getVerbNounProbability(action, person)
+                all_actions[action + " " + person] = {"type":"person", "action":action, "entity":person, "sentence":action_sentence, "simple": simple_action, "probability":probability}
 
         for place in self.places_in_paragraph:
             actions = ["go to", "look at"]
-            for action in actions:
-                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
-                    break
-                else:                    
-                    simple_action, action_sentence = self.getActionTemplates(action, place)
-                    probability = self.getProbability(simple_action)
-                    #probability = self.getProbability(action_sentence)
-                    #probability = self.getVerbNounProbability(action, place)
-                    all_actions[action + " " + place] = {"type":"place", "action":action, "entity":place, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+            for action in actions:                  
+                simple_action, action_sentence = self.getActionTemplates(action, place)
+                probability = self.getProbability(simple_action)
+                #probability = self.getProbability(action_sentence)
+                #probability = self.getVerbNounProbability(action, place)
+                all_actions[action + " " + place] = {"type":"place", "action":action, "entity":place, "sentence":action_sentence, "simple": simple_action, "probability":probability}
 
         for event in self.events_in_paragraph:
             actions = ["think about"]
             for action in actions:
-                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
-                    break
-                else:
-                    simple_action, action_sentence = self.getActionTemplates(action, event)
-                    probability = self.getProbability(simple_action)
-                    #probability = self.getProbability(action_sentence)
-                    #probability = self.getVerbNounProbability(action, event)
-                    all_actions[action + " " + event] = {"type":"event", "action":action, "entity":event, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+                simple_action, action_sentence = self.getActionTemplates(action, event)
+                probability = self.getProbability(simple_action)
+                #probability = self.getProbability(action_sentence)
+                #probability = self.getVerbNounProbability(action, event)
+                all_actions[action + " " + event] = {"type":"event", "action":action, "entity":event, "sentence":action_sentence, "simple": simple_action, "probability":probability}
 
         for item in self.items_in_paragraph:
             actions = ["take", "use", "push"]
             for action in actions:
-                if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
-                    break
-                else:
-                    simple_action, action_sentence = self.getActionTemplates(action, item)
-                    probability = self.getProbability(simple_action)
-                    #probability = self.getProbability(action_sentence)
-                    #probability = self.getVerbNounProbability(action, item)
-                    all_actions[action + " " + item] = {"type":"item", "action":action, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability}
-
-        for item in self.inventory:
-            if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
-                break
-            else:
-                simple_action, action_sentence = self.getActionTemplates("use", item)
+                simple_action, action_sentence = self.getActionTemplates(action, item)
                 probability = self.getProbability(simple_action)
                 #probability = self.getProbability(action_sentence)
                 #probability = self.getVerbNounProbability(action, item)
-                all_actions["use " + item] = {"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+                all_actions[action + " " + item] = {"type":"item", "action":action, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability}
 
         if (self.USE_NOUNS):
             for noun in self.nouns_in_paragraph:
                 actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
                 for action in actions:
-                    if self.MAX_ACTIONS > -1 and action_count == self.MAX_ACTIONS-1:
-                        break
-                    else:
-                        simple_action, action_sentence = self.getActionTemplates(action, noun)
-                        probability = self.getProbability(simple_action)
-                        #probability = self.getProbability(action_sentence)
-                        #probability = self.getVerbNounProbability(action, noun)
-                        all_actions[action + " " + noun] = {"type":"noun", "action":action, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability}
+                    simple_action, action_sentence = self.getActionTemplates(action, noun)
+                    probability = self.getProbability(simple_action)
+                    #probability = self.getProbability(action_sentence)
+                    #probability = self.getVerbNounProbability(action, noun)
+                    all_actions[action + " " + noun] = {"type":"noun", "action":action, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability}
         
         print("Found " + str(len(all_actions)) + " actions.")
         sorted_actions = sorted(all_actions.values(), key=operator.itemgetter("probability"))
+
+        if (self.MAX_ACTIONS > -1):
+            sorted_actions = sorted_actions[:self.MAX_ACTIONS]
+
         return sorted_actions            

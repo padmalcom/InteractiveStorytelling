@@ -207,9 +207,6 @@ class InteractiveStoryUI(object):
 
         actions = self.storyGenerator.generateActions()
 
-        if (self.storyGenerator.MAX_ACTIONS > -1):
-            actions = actions[:self.storyGenerator.MAX_ACTIONS]
-
         for action in actions:
             # 6.2 Continue without taking an action 
             print(action)
@@ -218,6 +215,12 @@ class InteractiveStoryUI(object):
             self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
             self.action_buttons[-1].setToolTip(action["sentence"])
             self.action_buttons[-1].clicked.connect(partial(self.clickAction, action["action"], action["entity"], action["sentence"]))
+
+            if (action["type"] == "item_from_inventory"):
+                self.action_buttons[-1].setStyleSheet("background-color: yellow")
+
+            if (action["type"] == "combination"):
+                self.action_buttons[-1].setStyleSheet("background-color: green")
 
         # 5.3 Check if there are any actions
         """if (len(self.storyGenerator.people_in_paragraph) > 0 or len(self.storyGenerator.places_in_paragraph) > 0 or
