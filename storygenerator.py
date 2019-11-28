@@ -230,8 +230,8 @@ class StoryGenerator():
                 if self.PRIORIZE_COMBINATIONS:
                     probability = -sys.float_info.max
                 #probability = self.getProbability(action_sentence)
-                #probability = self.getVerbNounProbability(action, place)
-                all_actions.append({"type":"combination", "action":simple_action, "entity":combination.returnItem.name, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                #probability = self.getVerbNounProbability(action, place) # 
+                all_actions.append({"type":"combination", "action":"combine", "entity":combination.returnItem.name, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for item in self.inventory:
             print("item in inv: " + item)
@@ -290,11 +290,11 @@ class StoryGenerator():
                     #probability = self.getProbability(action_sentence)
                     #probability = self.getVerbNounProbability(action, noun)
                     all_actions.append({"type":"noun", "action":action, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability})
-        
+
         print("Found " + str(len(all_actions)) + " actions.")
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
 
         if (self.MAX_ACTIONS > -1):
             sorted_actions = sorted_actions[:self.MAX_ACTIONS]
 
-        return sorted_actions            
+        return sorted_actions
