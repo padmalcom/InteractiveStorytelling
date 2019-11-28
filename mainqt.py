@@ -133,6 +133,7 @@ class InteractiveStoryUI(object):
             self.inventory_labels[-1].setText(entity)
             self.groupBox_2GridLayout.addWidget(self.inventory_labels[-1], (len(self.inventory_labels)-1) // 3, (len(self.inventory_labels)-1) % 3)
         elif action == "use from inventory":
+            print("Removing: " + str(entity))
             self.storyGenerator.inventory.remove(entity)
             # delete label
             for label in self.inventory_labels:
@@ -142,6 +143,7 @@ class InteractiveStoryUI(object):
                     self.inventory_labels.remove(label)
                     break
                     #label = None
+            print("Label should be deleted")
 
         self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence
 
@@ -221,92 +223,7 @@ class InteractiveStoryUI(object):
 
             if (action["type"] == "combination"):
                 self.action_buttons[-1].setStyleSheet("background-color: green")
-
-        # 5.3 Check if there are any actions
-        """if (len(self.storyGenerator.people_in_paragraph) > 0 or len(self.storyGenerator.places_in_paragraph) > 0 or
-            len(self.storyGenerator.events_in_paragraph) > 0 or len(self.storyGenerator.items_in_paragraph) > 0 or
-            (len(self.storyGenerator.nouns_in_paragraph) > 0 and self.storyGenerator.USE_NOUNS)):
-
-            # 6. Generate actions [Talk to, Take [item] {based on nlp}, go to [Place], Inspect [Item, Place, Person, Item in inventory], Push, Pull {fun?},
-            # insult/compliment [Person], use [item], combine [item, item]]
-            action_count = 0
-            for person in self.storyGenerator.people_in_paragraph:
-                actions = ["compliment", "insult", "look at", "who are you,"]
-                for action in actions:
-                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
-                        break
-                    else:
-                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                        self.action_buttons[-1].setText(action + " " + person)
-                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                        self.action_buttons[-1].setToolTip(action + " " + person)                    
-                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, person))
-                        action_count +=1
-
-            for place in self.storyGenerator.places_in_paragraph:
-                actions = ["go to", "look at"]
-                for action in actions:
-                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
-                        break
-                    else:                    
-                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                        self.action_buttons[-1].setText(action + " " + place)
-                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                        self.action_buttons[-1].setToolTip(action + " " + place)                    
-                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, place))
-                        action_count +=1
-
-            for event in self.storyGenerator.events_in_paragraph:
-                actions = ["think about"]
-                for action in actions:
-                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
-                        break
-                    else:
-                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                        self.action_buttons[-1].setText(action + " " + event)
-                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                        self.action_buttons[-1].setToolTip(action + " " + event)                    
-                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, event))
-                        action_count +=1
-
-            for item in self.storyGenerator.items_in_paragraph:
-                actions = ["take", "use", "push"]
-                for action in actions:
-                    if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
-                        break
-                    else:
-                        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                        self.action_buttons[-1].setText(action + " " + item)
-                        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                        self.action_buttons[-1].setToolTip(action + " " + item)
-                        self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, item))
-                        action_count +=1
-
-            for item in self.storyGenerator.inventory:
-                if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
-                    break
-                else:
-                    self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                    self.action_buttons[-1].setText("use " + item + " from inventory")
-                    self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                    self.action_buttons[-1].setToolTip("use " + item + " from inventory")
-                    self.action_buttons[-1].clicked.connect(partial(self.clickAction, "use from inventory", item))
-                    action_count +=1
-
-            if (self.storyGenerator.USE_NOUNS):
-                for noun in self.storyGenerator.nouns_in_paragraph:
-                    actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
-                    for action in actions:
-                        if self.storyGenerator.MAX_ACTIONS > -1 and action_count == self.storyGenerator.MAX_ACTIONS-1:
-                            break
-                        else:
-                            self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-                            self.action_buttons[-1].setText(action + " " + noun)
-                            self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-                            self.action_buttons[-1].setToolTip(action + " " + noun)                    
-                            self.action_buttons[-1].clicked.connect(partial(self.clickAction, action, noun))
-                            action_count +=1"""
-
+                self.action_buttons[-1].setText(action["simple"])
 
         # 6.2 Continue without taking an action 
         self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
