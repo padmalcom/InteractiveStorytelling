@@ -14,6 +14,8 @@ class TwineGenerator():
         self.action_buttons = []
         self.inventory_labels = []
 
+        self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
+
     def reset(self):
         self.storyGenerator.reset()
 
@@ -45,8 +47,7 @@ class TwineGenerator():
         self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
         self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
 
-        empty_action = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
-        self.recursivelyContinue(f, self.storyGenerator.paragraph, self.storyGenerator.html_paragraph, self.storyGenerator.inventory, "1", 0, empty_action)
+        self.recursivelyContinue(f, self.storyGenerator.paragraph, self.storyGenerator.html_paragraph, self.storyGenerator.inventory, "1", 0, self.EMPTY_ACTION)
 
         #self.storyGenerator.generateEnd()
         f.write("The end\r\n")
@@ -65,12 +66,12 @@ class TwineGenerator():
             f.write("::" + str(twineid) + "\r\n")
   
         # write text
-        f.write(html + "\r\n")
+        f.write(html)
 
         # process given action
         if action["action"] == "take":
             inventory.append(action["entity"])
-        elif action["action"] == "use from inventory":
+        elif action["action"] == "use" and action["type"] == "item_from_inventory":
             inventory.remove(action["entity"])
 
         # generate next paragraph
@@ -84,7 +85,7 @@ class TwineGenerator():
 
         html_paragraph = paragraph
 
-        f.write(html_paragraph + "\r\n")
+        f.write(html_paragraph)
 
         # Generate links
         actions = self.storyGenerator.generateActions()
@@ -94,43 +95,9 @@ class TwineGenerator():
             # call recursive generation
             self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, str(twineid) + "_" + str(idx), depth, action)
 
-
-    """def createButtons(self):
-
-        # 5.2 Are there any buttons? Destroy
-        for button in self.action_buttons:
-            self.groupBoxGridLayout.removeWidget(button)
-            button.deleteLater()
-            button = None
-        self.action_buttons.clear()
-
-        actions = self.storyGenerator.generateActions()
-
-        for action in actions:
-            # 6.2 Continue without taking an action 
-            print(action)
-            self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-            self.action_buttons[-1].setText(action["action"] + " " + action["entity"])
-            self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-            self.action_buttons[-1].setToolTip(action["sentence"])
-            self.action_buttons[-1].clicked.connect(partial(self.clickAction, action["action"], action["entity"], action["sentence"]))
-
-            if (action["type"] == "item_from_inventory"):
-                self.action_buttons[-1].setStyleSheet("background-color: yellow")
-
-            if (action["type"] == "combination"):
-                self.action_buttons[-1].setStyleSheet("background-color: green")
-                self.action_buttons[-1].setText(action["simple"])
-
-        # 6.2 Continue without taking an action 
-        self.action_buttons.append(QtWidgets.QPushButton(self.groupBox))
-        self.action_buttons[-1].setText("continue")
-        self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
-        self.action_buttons[-1].setToolTip("continue")
-        self.action_buttons[-1].clicked.connect(partial(self.clickAction, "", ""))"""
-
-   
-
+        # simple continue button
+        f.write("[[continue->" + len(actions)+"]]\r\n")
+        self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, str(twineid) + "_" + str(idx), depth, self.EMPTY_ACTION)
 
 if __name__ == '__main__':
     tg = TwineGenerator()
