@@ -290,7 +290,27 @@ class InteractiveStoryUI(object):
             self.storyGenerator.current_paragraphs += 1
 
         else:
-            self.storyGenerator.generateEnd()
+            end = self.storyGenerator.generateEnd()
+            self.storyGenerator.text = self.storyGenerator.text + " " + end
+
+            trucated_text = self.storyGenerator.truncateLastSentences(200)
+            new_text = self.storyGenerator.generateText(trucated_text)
+
+            self.storyGenerator.paragraph = new_text
+
+            # extract entities
+            self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
+
+            self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
+            
+            self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
+            self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+
+            # append html and text
+            self.storyGenerator.text = self.storyGenerator.text + self.storyGenerator.paragraph
+            temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
+            self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
+            ui.textEdit.setHtml(temp_html + "<br><b>THE END</b>" + self.storyGenerator.HTML_END)
 
 
 if __name__ == '__main__':

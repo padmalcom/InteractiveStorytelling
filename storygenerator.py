@@ -41,7 +41,7 @@ class StoryGenerator():
         self.HTML_END = "</body></html>"
         self.gpt2 = GPT2(dummy=False)
         self.USE_NOUNS = True
-        self.MAX_ACTIONS = 18
+        self.MAX_ACTIONS = 2
         self.actionTemplates = ActionTemplates()
         self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"] 
         self.bigramModel = None
@@ -156,7 +156,7 @@ class StoryGenerator():
         self.text = self.text + ending_text
         temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + html_ending + "</span>"        
         self.html = self.html + html_ending
-        return temp_html + self.HTML_END
+        return temp_html
 
     def extractEntities(self, text):
         # 4. NLP on paragraph [Extract People, Places, Items]
