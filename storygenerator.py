@@ -11,12 +11,14 @@ from nltk.corpus import brown
 from nltk import bigrams, trigrams
 from nltk.corpus import wordnet as wn
 from textblob import TextBlob
+import gender_guesser.detector as gender
 
 # custom
 from gpt2 import GPT2
 from actiontemplates import ActionTemplates
 from item import items
 from setting import settings
+from settings import coherence_phrases
 from combination import combinations
 
 class StoryGenerator():
@@ -34,6 +36,8 @@ class StoryGenerator():
         self.nouns_in_paragraph = []
         self.current_paragraphs = 0 # Tract current paractraph
         self.name = ""
+        self.party1 = ""
+        self.party2 = ""
         self.setting = ""
         self.setting_id = 0
         self.text = ""
@@ -49,8 +53,10 @@ class StoryGenerator():
         self.paragraph = ""
         self.paragraphs = 6
         self.CHANCE_TO_REMEMBER_ITEM = 0.3
+        self.CHANCE_TO_REMEMBER_PERSON = 0.7
         self.PRIORIZE_ITEM_USAGE = True
         self.PRIORIZE_COMBINATIONS = True
+        self.gender = gender.Detector()
 
         try:
             nltk.data.find('tokenizers/wordnet')
@@ -76,6 +82,8 @@ class StoryGenerator():
         self.nouns_in_paragraph.clear()
         self.current_paragraphs = 0 # Tract current paractraph
         self.name = ""
+        self.party1 = ""
+        self.party2 = ""
         self.setting = ""
         self.setting_id = 0
         self.text = ""
@@ -133,6 +141,21 @@ class StoryGenerator():
             else:
                 result = sentence + " " + result
         return result
+        
+    def replaceGenderTokens(self, sentences, name):
+        g = self.gender.get_gender(name)
+        hisher = ""
+        heshe = ""
+        if (g == "unknown" or g == "androgynous" or g == "male" or g == "mostly_male"):
+            hisher = "his"
+            heshe = "he"
+        else:
+            hisher = "her"
+            heshe = "she"
+            
+        s = sentences.replace("[hisher]", hisher)
+        s = s.replace("[heshe]", heher)
+        return s
 
 
     def generateText(self, history):
@@ -143,8 +166,24 @@ class StoryGenerator():
         p = random.randint(0, 100) / 100.0
         if p <= self.CHANCE_TO_REMEMBER_ITEM and len(self.inventory) > 0:
             item = random.choice(self.inventory)
-            addinfo = "In that particular moment, " + self.name + " remembered he had a " + item + " in his pocket."
-        return " ".join(sentences) + " " + addinfo
+            addinfo = "In that particular moment, " + self.name + " remembered [heshe] had a " + item + " in [hisher] pocket."
+            addinfo = self.replaceGenderTokens(addinfo, self.name)
+            sentences.append(addinfo)
+        
+        reminder = ""
+        p = random.randint(0, 100) / 100.0
+        if p <= self.CHANCE_TO_REMEMBER_PERSON and (self.party1 != "" or self.party2 != ""):
+            addpersoninfo = random.choice(coherence_phrases)
+            
+            if (self.party1 != "" and addpersoninfo.find(self.party1) > -1):
+                addpersoninfo = addpersoninfo.replace("[person1]", self.party1)
+                addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party1)
+            if (self.party2 != "" and addpersoninfo.find(self.party2) > -1):
+                addpersoninfo = addpersoninfo.replace("[person2]", self.party2)
+                addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party2)
+            sentences.append(addpersoninfo)
+        
+        return " ".join(sentences)
 
     def generateEnd(self):
         print("End reached")

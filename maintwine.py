@@ -19,6 +19,15 @@ class TwineGenerator():
 
     def reset(self):
         self.storyGenerator.reset()
+        
+    def getInventoryCode(self):
+        return ["window.getInv = function() {return state.active.variables.inventory;}",
+            "macros.initInv = {handler: function(place, macroName, params, parser) {state.active.variables.inventory = [];}};",
+            "macros.addToInv = {handler: function(place, macroName, params, parser) {if (params.length == 0) {throwError(place, \"<<\" + macroName + \">>: no parameters given\");return;}    if (state.active.variables.inventory.indexOf(params[0]) == -1) {state.active.variables.inventory.push(params[0]);}}};",
+            "macros.removeFromInv = {handler: function(place, macroName, params, parser) {if (params.length == 0) {throwError(place, \"<<\" + macroName + \">>: no parameters given\"); return;} var index = state.active.variables.inventory.indexOf(params[0]); if (index != -1) {state.active.variables.inventory.splice(index, 1);}}};",
+            "macros.inv = {handler: function(place, macroName, params, parser) {if (state.active.variables.inventory.length == 0) {new Wikifier(place, 'nothing');} else {new Wikifier(place, state.active.variables.inventory.join(','));}}};",
+            "macros.invWithLinks = {handler: function(place, macroName, params, parser) {if (state.active.variables.inventory.length == 0) {new Wikifier(place, 'nothing');} else {new Wikifier(place, '[[' + state.active.variables.inventory.join(']]<br>[[') + ']]');}}};",
+            "macros.emptyInv = {handler: function(place, macroName, params, parser) {state.active.variables.inventory = []}};"]            
 
     def start(self):
 
@@ -32,15 +41,24 @@ class TwineGenerator():
 
         self.storyGenerator.setting = input("Select a setting: ")
         self.storyGenerator.name = input("Type your name: ")
+        self.storyGenerator.party1 = input("Type a name of a party member: ")
+        self.storyGenerator.party2 = input("Type the name of another member: ")
         self.storyGenerator.paragraphs = int(input("Enter a number of paragraphs: "))
 
         self.storyGenerator.setting_id = random.randrange(0, len(self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions))
         self.storyGenerator.setting_id = 0 # temporary
         self.storyGenerator.paragraph = self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions[self.storyGenerator.setting_id]
 
-        # Write intro
+        # Open file to write
         f = open("C:/Users/admin/test.tw2", "w", encoding="utf-8")
+        
+        # Add inventory
+        for line in self.getInventoryCode():
+            f.Write(line + "\n")
+                    
+        # Write start
         f.write("::StoryTitle\n")
+        f.write("<<initInv>>")
         f.write("A " + self.storyGenerator.setting + " story\n")
         f.writelines(["\n", "::Configuration [twee2]\n","Twee2::build_config.story_ifid = '7870917a-11c5-4bb8-a945-c810834c8229'\n","Twee2::build_config.story_format = 'SugarCube2'\n", "\n"])
 
@@ -77,7 +95,7 @@ class TwineGenerator():
             self.storyGenerator.text = self.storyGenerator.text + " " + action["sentence"] + " " + end
             trucated_text = self.storyGenerator.truncateLastSentences(200)
             new_text = self.storyGenerator.generateText(trucated_text)
-            paragraph = action["sentence"] + " " +new_text
+            paragraph = action["sentence"] + " " end + " " + new_text
             self.storyGenerator.extractEntities(paragraph)
             html_paragraph = paragraph
             f.write(html_paragraph + "\n<b>THE END</b>\n")
@@ -86,9 +104,11 @@ class TwineGenerator():
         # process given action
         if action["action"] == "take":
             inventory.append(action["entity"])
+            f.write("<<addToInv \""+action["entity"]+"\">>")
         elif action["action"] == "use" and action["type"] == "item_from_inventory":
             if action["entity"] in inventory:
                 inventory.remove(action["entity"])
+                f.write("<<removeFromInv \""+action["entity"]+"\">>")
             else:
                 print("Trying to remove " + action["entity"] + " but not in inv.")
 

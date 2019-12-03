@@ -16,3 +16,16 @@ settings = {
     "harry potter": Setting("Harry Potter", ["Harry was in love with Hermione. They know each other for four years now and finally felt that they belong together. When they were alone in the Griffindor rooms, they hugged each other for a long time and before Harry knew what he was up to he kissed her gently on the lips."], ["They married on a rainy saturday with all their friends and family around them."]
     )
 }
+
+coherence_phrases = ["[person1] rolled [hisher] eyes.",
+    "[person1] cleared [hisher] throat.",
+    "[person1] made a noise.",
+    "[person1] raised [hisher] hand.",
+    "[person1] stamped [hisher] feet.",
+    "[person1]'s face expressed interest.",
+    "[person1] raised [hisher] eyebrows.",
+    "[person1] looked bored.",
+    "[person1] yawned.",
+    "[person1] rubbed [hisher] closed eyes.",
+    "[person1] took a deep breath.",
+    "[person1] laughed."]
