@@ -116,7 +116,7 @@ class InteractiveStoryUI(object):
             button = None
         self.inventory_labels.clear()
 
-    def clickAction(self, action, entity, action_sentence):
+    def clickAction(self, action, action_type, entity, action_sentence):
 
         # If no action is defined, just continue on the last text block.
         #if (action == "" and entity == ""):
@@ -132,7 +132,7 @@ class InteractiveStoryUI(object):
             self.inventory_labels.append(QtWidgets.QLabel(self.groupBox_2))
             self.inventory_labels[-1].setText(entity)
             self.groupBox_2GridLayout.addWidget(self.inventory_labels[-1], (len(self.inventory_labels)-1) // 3, (len(self.inventory_labels)-1) % 3)
-        elif action == "use from inventory":
+        elif action == "use" and action_type == "item_from_inventory":
             print("Removing: " + str(entity))
             self.storyGenerator.inventory.remove(entity)
             # delete label
@@ -156,6 +156,8 @@ class InteractiveStoryUI(object):
             new_text = self.storyGenerator.generateText(trucated_text)
 
             self.storyGenerator.paragraph = new_text
+            self.storyGenerator.all_paragraphs.append(new_text)
+            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
 
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
@@ -177,6 +179,8 @@ class InteractiveStoryUI(object):
             trucated_text = self.storyGenerator.truncateLastSentences(200)
             new_text = self.storyGenerator.generateText(trucated_text)
             self.storyGenerator.paragraph = action_sentence + " " + new_text
+            self.storyGenerator.all_paragraphs.append(action_sentence + " " + new_text)
+            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
 
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
@@ -216,7 +220,7 @@ class InteractiveStoryUI(object):
             self.action_buttons[-1].setText(action["action"] + " " + action["entity"])
             self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
             self.action_buttons[-1].setToolTip(action["sentence"])
-            self.action_buttons[-1].clicked.connect(partial(self.clickAction, action["action"], action["entity"], action["sentence"]))
+            self.action_buttons[-1].clicked.connect(partial(self.clickAction, action["action"], action["type"], action["entity"], action["sentence"]))
 
             if (action["type"] == "item_from_inventory"):
                 self.action_buttons[-1].setStyleSheet("background-color: yellow")
@@ -230,12 +234,13 @@ class InteractiveStoryUI(object):
         self.action_buttons[-1].setText("continue")
         self.groupBoxGridLayout.addWidget(self.action_buttons[-1], (len(self.action_buttons)-1) // 3, (len(self.action_buttons)-1) % 3)
         self.action_buttons[-1].setToolTip("continue")
-        self.action_buttons[-1].clicked.connect(partial(self.clickAction, "", ""))
+        self.action_buttons[-1].clicked.connect(partial(self.clickAction, "", "", "", ""))
 
     def startNewGame(self):
         self.storyGenerator.html = ""
         self.storyGenerator.html_paragraph = ""
         self.storyGenerator.paragraph = ""
+        self.storyGenerator.all_paragraphs.clear()
         self.storyGenerator.current_paragraphs = 0
         self.storyGenerator.people_in_paragraph.clear()
         self.storyGenerator.places_in_paragraph.clear()
@@ -263,6 +268,8 @@ class InteractiveStoryUI(object):
 
             # Replace [name]
             self.storyGenerator.paragraph = self.storyGenerator.paragraph.replace("[name]", self.storyGenerator.name)
+            self.storyGenerator.all_paragraphs.append(self.storyGenerator.paragraph)
+            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
 
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
 
@@ -297,6 +304,8 @@ class InteractiveStoryUI(object):
             new_text = self.storyGenerator.generateText(trucated_text)
 
             self.storyGenerator.paragraph = new_text
+            self.storyGenerator.all_paragraphs.append(new_text)
+            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
 
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)

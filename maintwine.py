@@ -75,7 +75,7 @@ class TwineGenerator():
         f.close()
         end_time = datetime.now()
         second_diff = (start_time - end_time).total_seconds()
-        print("duration in seconds: " + second_diff.strftime("%d/%m/%Y %H:%M:%S"))
+        print("duration in seconds: " + str(second_diff))
 
 
     def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action):

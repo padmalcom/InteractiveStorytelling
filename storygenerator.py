@@ -15,6 +15,7 @@ import gender_guesser.detector as gender
 
 # custom
 from gpt2 import GPT2
+from coherence import Coherence
 from actiontemplates import ActionTemplates
 from item import items
 from setting import settings
@@ -35,9 +36,10 @@ class StoryGenerator():
         self.events_in_paragraph = []
         self.nouns_in_paragraph = []
         self.current_paragraphs = 0 # Tract current paractraph
+        self.all_paragraphs = []
         self.name = ""
-        self.party1 = ""
-        self.party2 = ""
+        self.party1 = "John"
+        self.party2 = "Sally"
         self.setting = ""
         self.setting_id = 0
         self.text = ""
@@ -45,7 +47,7 @@ class StoryGenerator():
         self.HTML_END = "</body></html>"
         self.gpt2 = GPT2(dummy=False)
         self.USE_NOUNS = True
-        self.MAX_ACTIONS = 2
+        self.MAX_ACTIONS = 3
         self.actionTemplates = ActionTemplates()
         self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"] 
         self.bigramModel = None
@@ -56,7 +58,9 @@ class StoryGenerator():
         self.CHANCE_TO_REMEMBER_PERSON = 0.7
         self.PRIORIZE_ITEM_USAGE = True
         self.PRIORIZE_COMBINATIONS = True
+        self.AVOID_SIMILAR_NOUNS = False # This one is buggy as hell
         self.gender = gender.Detector()
+        self.coherence = Coherence()
 
         try:
             nltk.data.find('tokenizers/wordnet')
@@ -91,6 +95,7 @@ class StoryGenerator():
         self.HTML_END = "</body></html>"
         self.paragraph = ""
         self.paragraphs = 4
+        self.all_paragraphs.clear()
 
     def getSettings(self):
         return settings
@@ -99,23 +104,24 @@ class StoryGenerator():
         simpleaction, extaction = self.actionTemplates.getTemplate(action, self.name, entity)
         return simpleaction, extaction
 
+    def calculateParagraphCoherence(self):
+        return self.coherence.calculateCoherence(self.all_paragraphs)
+
     def getProbability(self, sentence):
         return self.gpt2.score_probability(sentence)
 
-    def getVerbNounProbability(self, verb, noun):
-        #nlp = spacy.load("en_core_web_lg")
-        tokens = self.nlp(verb + " " + noun)
-        return tokens[0].similarity(tokens[1])
+    #def getVerbNounProbability(self, verb, noun):
+    #    tokens = self.nlp(verb + " " + noun)
+    #    return tokens[0].similarity(tokens[1])
 
-    def getSentiment(self, text):
-        analysis = TextBlob(text) 
-        # set sentiment 
-        if analysis.sentiment.polarity > 0: 
-            return 'positive'
-        elif analysis.sentiment.polarity == 0: 
-            return 'neutral'
-        else: 
-            return 'negative'
+    #def getSentiment(self, text):
+    #    analysis = TextBlob(text) 
+    #    if analysis.sentiment.polarity > 0: 
+    #        return 'positive'
+    #    elif analysis.sentiment.polarity == 0: 
+    #        return 'neutral'
+    #    else: 
+    #        return 'negative'
 
     def splitSentences(self, textExtract, allowIncomplete=False):
         nlp2 = spacy.load("en_core_web_lg")
@@ -154,9 +160,8 @@ class StoryGenerator():
             heshe = "she"
             
         s = sentences.replace("[hisher]", hisher)
-        s = s.replace("[heshe]", heher)
+        s = s.replace("[heshe]", heshe)
         return s
-
 
     def generateText(self, history):
         text = self.gpt2.generate_text(history, 100)
@@ -170,7 +175,6 @@ class StoryGenerator():
             addinfo = self.replaceGenderTokens(addinfo, self.name)
             sentences.append(addinfo)
         
-        reminder = ""
         p = random.randint(0, 100) / 100.0
         if p <= self.CHANCE_TO_REMEMBER_PERSON and (self.party1 != "" or self.party2 != ""):
             addpersoninfo = random.choice(coherence_phrases)
@@ -212,7 +216,7 @@ class StoryGenerator():
 
         # 4.2 extract each entity
         for ent in doc.ents:
-            if (ent.kb_id_ in entity_ids.keys()):
+            if (ent.kb_id_ in entity_ids.keys() and self.AVOID_SIMILAR_NOUNS):
                 print("Will not add entity " + ent.text + " because it is similar to " + entity_ids[ent.kb_id_] + ".")
                 continue
 
