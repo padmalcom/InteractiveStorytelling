@@ -31,7 +31,7 @@ class TwineGenerator():
 
     def start(self):
 
-        start_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        start_time = datetime.now()
 
         self.storyGenerator.reset()
 
@@ -54,7 +54,7 @@ class TwineGenerator():
         
         # Add inventory
         for line in self.getInventoryCode():
-            f.Write(line + "\n")
+            f.write(line + "\n")
                     
         # Write start
         f.write("::StoryTitle\n")
@@ -73,9 +73,9 @@ class TwineGenerator():
 
         f.write("The end\n")
         f.close()
-        end_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        end_time = datetime.now()
         second_diff = (start_time - end_time).total_seconds()
-        print("duration in seconds: " + str(second_diff))
+        print("duration in seconds: " + second_diff.strftime("%d/%m/%Y %H:%M:%S"))
 
 
     def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action):
@@ -95,7 +95,7 @@ class TwineGenerator():
             self.storyGenerator.text = self.storyGenerator.text + " " + action["sentence"] + " " + end
             trucated_text = self.storyGenerator.truncateLastSentences(200)
             new_text = self.storyGenerator.generateText(trucated_text)
-            paragraph = action["sentence"] + " " end + " " + new_text
+            paragraph = action["sentence"] + " " + end + " " + new_text
             self.storyGenerator.extractEntities(paragraph)
             html_paragraph = paragraph
             f.write(html_paragraph + "\n<b>THE END</b>\n")

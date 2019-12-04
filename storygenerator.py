@@ -18,7 +18,7 @@ from gpt2 import GPT2
 from actiontemplates import ActionTemplates
 from item import items
 from setting import settings
-from settings import coherence_phrases
+from setting import coherence_phrases
 from combination import combinations
 
 class StoryGenerator():
