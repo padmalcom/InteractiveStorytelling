@@ -179,13 +179,22 @@ class StoryGenerator():
         if p <= self.CHANCE_TO_REMEMBER_PERSON and (self.party1 != "" or self.party2 != ""):
             addpersoninfo = random.choice(coherence_phrases)
             
-            if (self.party1 != "" and addpersoninfo.find(self.party1) > -1):
-                addpersoninfo = addpersoninfo.replace("[person1]", self.party1)
-                addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party1)
-            if (self.party2 != "" and addpersoninfo.find(self.party2) > -1):
-                addpersoninfo = addpersoninfo.replace("[person2]", self.party2)
-                addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party2)
-            sentences.append(addpersoninfo)
+            rndPerson = -1
+            if (self.party1 == "" and self.party2 != ""):
+                rndPerson = 1
+            elif (self.party1 != "" and self.party2 == ""):
+                rndPerson = 0
+            else:
+                rndPerson = random.randint(0, 1)
+
+            if rndPerson > -1:
+                if (rndPerson == 0 and addpersoninfo.find(["person"]) > -1):
+                    addpersoninfo = addpersoninfo.replace("[person]", self.party1)
+                    addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party1)          
+                if (rndPerson == 1 and addpersoninfo.find(["person"]) > -1):
+                    addpersoninfo = addpersoninfo.replace("[person]", self.party2)
+                    addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party2)
+                sentences.append(addpersoninfo)
         
         return " ".join(sentences)
 

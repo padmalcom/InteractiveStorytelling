@@ -17,15 +17,15 @@ settings = {
     )
 }
 
-coherence_phrases = ["[person1] rolled [hisher] eyes.",
-    "[person1] cleared [hisher] throat.",
-    "[person1] made a noise.",
-    "[person1] raised [hisher] hand.",
-    "[person1] stamped [hisher] feet.",
-    "[person1]'s face expressed interest.",
-    "[person1] raised [hisher] eyebrows.",
-    "[person1] looked bored.",
-    "[person1] yawned.",
-    "[person1] rubbed [hisher] closed eyes.",
-    "[person1] took a deep breath.",
-    "[person1] laughed."]
+coherence_phrases = ["[person] rolled [hisher] eyes.",
+    "[person] cleared [hisher] throat.",
+    "[person] made a noise.",
+    "[person] raised [hisher] hand.",
+    "[person] stamped [hisher] feet.",
+    "[person]'s face expressed interest.",
+    "[person] raised [hisher] eyebrows.",
+    "[person] looked bored.",
+    "[person] yawned.",
+    "[person] rubbed [hisher] closed eyes.",
+    "[person] took a deep breath.",
+    "[person] laughed."]
