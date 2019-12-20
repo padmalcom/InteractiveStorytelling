@@ -7,7 +7,7 @@ import sys
 import spacy
 import en_core_web_lg
 import nltk
-from nltk.corpus import brown
+from nltk.corpus import brown, reuters
 from nltk import bigrams, trigrams
 from nltk.corpus import wordnet as wn
 from textblob import TextBlob
@@ -61,6 +61,7 @@ class StoryGenerator():
         self.AVOID_SIMILAR_NOUNS = False # This one is buggy as hell
         self.gender = gender.Detector()
         self.coherence = Coherence()
+        
 
         try:
             nltk.data.find('tokenizers/wordnet')
@@ -72,7 +73,31 @@ class StoryGenerator():
         except LookupError:
             nltk.download('brown')
 
-        #self.__buildNGramModels__()
+        try:
+            nltk.data.find('tokenizers/reuters')
+        except LookupError:
+            nltk.download('reuters')            
+
+        self.__buildNGramModels__()
+
+        # test
+        p1 = self.getVerbNounProbability("take", "apple")
+        p2 = self.getProbabilityNgram("takes an apple")
+        p3 = self.gpt2.score_probability("takes an apple")
+
+        print("p1 " + str(p1) + " p2 " + str(p2) + " p3 " + str(p3))
+
+        p11 = self.getVerbNounProbability("take", "car")
+        p12 = self.getProbabilityNgram("takes a car")
+        p13 = self.gpt2.score_probability("takes a car")
+
+        print("p11 " + str(p11) + " p12 " + str(p12) + " p13 " + str(p13))
+
+        p21 = self.getVerbNounProbability("push", "love")
+        p22 = self.getProbabilityNgram("pushes a love")
+        p23 = self.gpt2.score_probability("pushes a love")
+
+        print("p21 " + str(p21) + " p22 " + str(p22) + " p23 " + str(p23))        
 
     def reset(self):
         self.inventory.clear()
@@ -110,9 +135,71 @@ class StoryGenerator():
     def getProbability(self, sentence):
         return self.gpt2.score_probability(sentence)
 
-    #def getVerbNounProbability(self, verb, noun):
-    #    tokens = self.nlp(verb + " " + noun)
-    #    return tokens[0].similarity(tokens[1])
+    def getVerbNounProbability(self, verb, noun):
+        tokens = self.nlp(verb + " " + noun)
+        return tokens[0].similarity(tokens[1])
+
+    def __buildNGramModels__(self):
+        #https://www.analyticsvidhya.com/blog/2019/08/comprehensive-guide-language-model-nlp-python-code/
+        print("Building ngram models...")
+        # Create a placeholder for model
+        self.bigramModel = defaultdict(lambda: defaultdict(lambda: 0))
+        self.trigramModel = defaultdict(lambda: defaultdict(lambda: 0))
+
+        # Count frequency of co-occurance  
+        for sentence in reuters.sents():
+            for w1, w2, w3 in trigrams(sentence, pad_right=True, pad_left=True):
+                self.trigramModel[(w1, w2)][w3] += 1
+            for w1, w2 in bigrams(sentence, pad_right=True, pad_left=True):
+                self.bigramModel[(w1)][w2] += 1
+        
+        # Let's transform the counts to probabilities
+        for w1_w2 in self.trigramModel:
+            total_count = float(sum(self.trigramModel[w1_w2].values()))
+            for w3 in self.trigramModel[w1_w2]:
+                self.trigramModel[w1_w2][w3] /= total_count
+
+        for w1 in self.bigramModel:
+            total_count = float(sum(self.bigramModel[w1].values()))
+            for w2 in self.bigramModel[w1]:
+                self.bigramModel[w1][w2] /= total_count
+        print("Done building models")
+
+    def getProbabilityNgram(self, sentence):
+        doc = self.nlp(sentence)
+        words = [token.text for token in doc if token.is_punct != True]
+        if (len(words) < 2 or (len(words) > 3)):
+            print("Ngram probability only supports 2 or 3 words. You entered " + str(len(words)) + "('" + sentence + "').")
+            return 0.0
+        else:
+            if (len(words) == 2):
+                prob = self.getProbabilityBigram(words[0], words[1])
+                return prob
+            else:
+                prob = self.getProbabilityTrigram(words[0], words[1], words[2])
+                return prob
+        print("Here")
+        return 0.0
+
+    def getProbabilityBigram(self, word1, word2):
+        bigramDict = dict(self.bigramModel[word1])
+        print("bigram for " + word1)
+        print(bigramDict)
+        if word2 in bigramDict:
+            return bigramDict[word2]
+        else:
+            print("Not all words in dict 2 ")
+            return 0.0
+
+    def getProbabilityTrigram(self, word1, word2, word3):
+        trigramDict = dict(self.trigramModel[word1, word2])
+        print("Trigram for " + word1 + " and " + word2)
+        print(trigramDict)
+        if word3 in trigramDict:
+            return trigramDict[word3]
+        else:
+            print("Not all words in dict 3 ")
+            return 0.0
 
     #def getSentiment(self, text):
     #    analysis = TextBlob(text) 

@@ -128,9 +128,10 @@ class GPT2:
             lp += np.log(predicted_prob[self.tokenizer.convert_tokens_to_ids([tokenize_input[i]])[0]])
         return lp """
 
+        # https://github.com/huggingface/transformers/issues/473
         tokenize_input = self.tokenizer.tokenize(sentence)
         tensor_input = torch.tensor([self.tokenizer.convert_tokens_to_ids(tokenize_input)])
         tensor_input = tensor_input.to(self.device)
         outputs = self.model(tensor_input, labels=tensor_input)
-        loss, logits = outputs[:2]
+        loss, _ = outputs[:2]
         return math.exp(loss)
