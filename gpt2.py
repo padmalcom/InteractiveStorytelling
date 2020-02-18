@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from transformers import GPT2Config
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import AutoModelWithLMHead, AutoTokenizer #GPT2LMHeadModel, GPT2Tokenizer, 
 import math
 
 class GPT2:
@@ -68,14 +68,27 @@ class GPT2:
                 result.append(generated)
         return result
 
-    def __init__(self, dummy=False):
+    def __init__(self, model_scale=0, dummy=False):
         if not dummy:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.n_gpu = torch.cuda.device_count()
             self.set_seed(42, self.n_gpu)
             self.num_samples = 1
-            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-large")
-            self.model = GPT2LMHeadModel.from_pretrained("gpt2-large")
+            if model_scale == 0:
+                self.tokenizer = AutoTokenizer.from_pretrained("distilgpt2")
+                self.model = AutoModelWithLMHead.from_pretrained("distilgpt2")
+            elif model_scale == 1:
+                self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+                self.model = AutoModelWithLMHead.from_pretrained("gpt2")
+            elif model_scale == 2:
+                self.tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+                self.model = AutoModelWithLMHead.from_pretrained("gpt2-medium")
+            elif model_scale == 3:
+                self.tokenizer = AutoTokenizer.from_pretrained("gpt2-large")
+                self.model = AutoModelWithLMHead.from_pretrained("gpt2-large")
+            else:
+                self.tokenizer = AutoTokenizer.from_pretrained("gpt2-xl")
+                self.model = AutoModelWithLMHead.from_pretrained("gpt2-xl")
             self.model.to(self.device)
             self.model.eval()
             self.temperature = 1.0

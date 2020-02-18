@@ -45,7 +45,7 @@ class StoryGenerator():
         self.text = ""
         self.html = "<html><body>"
         self.HTML_END = "</body></html>"
-        self.gpt2 = GPT2(dummy=False)
+        self.gpt2 = GPT2(0, dummy=False)
         self.USE_NOUNS = True
         self.MAX_ACTIONS = 3
         self.actionTemplates = ActionTemplates()
@@ -275,10 +275,10 @@ class StoryGenerator():
                 rndPerson = random.randint(0, 1)
 
             if rndPerson > -1:
-                if (rndPerson == 0 and addpersoninfo.find(["person"]) > -1):
+                if (rndPerson == 0 and addpersoninfo.find("[person]") > -1):
                     addpersoninfo = addpersoninfo.replace("[person]", self.party1)
                     addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party1)          
-                if (rndPerson == 1 and addpersoninfo.find(["person"]) > -1):
+                if (rndPerson == 1 and addpersoninfo.find("[person]") > -1):
                     addpersoninfo = addpersoninfo.replace("[person]", self.party2)
                     addpersoninfo = self.replaceGenderTokens(addpersoninfo, self.party2)
                 sentences.append(addpersoninfo)
