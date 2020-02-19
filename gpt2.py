@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from transformers import GPT2Config
-from transformers import AutoModelWithLMHead, AutoTokenizer #GPT2LMHeadModel, GPT2Tokenizer, 
+from transformers import AutoModelWithLMHead, AutoTokenizer
 import math
 
 class GPT2:
@@ -16,7 +16,7 @@ class GPT2:
         if n_gpu > 0:
             torch.cuda.manual_seed_all(seed)
 
-    def top_k_top_p_filtering(self, logits):
+    def _top_k_top_p_filtering(self, logits):
         top_k = 0
         top_p = 0.9
         filter_value=-float('Inf')
@@ -59,7 +59,7 @@ class GPT2:
                     for _ in set(generated[i].tolist()):
                         next_token_logits[i, _] /= 1.0
                     
-                filtered_logits = self.top_k_top_p_filtering(next_token_logits)
+                filtered_logits = self._top_k_top_p_filtering(next_token_logits)
                 if self.temperature == 0: # greedy sampling:
                     next_token = torch.argmax(filtered_logits, dim=-1).unsqueeze(-1)
                 else:

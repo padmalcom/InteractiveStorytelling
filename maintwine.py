@@ -80,7 +80,7 @@ class TwineGenerator():
 
     def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action):
 
-        print("Depth " + str(depth) + " of " + str(self.storyGenerator.paragraphs-1))
+        print("Depth " + str(depth) + " of " + str(self.storyGenerator.paragraphs))
 
         # generate twine paragraph id
         if twineid == "1":
