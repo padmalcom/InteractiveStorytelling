@@ -50,7 +50,8 @@ class TwineGenerator():
         self.storyGenerator.paragraph = self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions[self.storyGenerator.setting_id]
 
         # Open file to write
-        f = open("C:/Users/admin/test.tw2", "w", encoding="utf-8")
+        out_file = datetime.now().strftime("story_%m.%d.%Y_%H-%M-%S.tw2")
+        f = open("C:/Users/admin/" + out_file, "w", encoding="utf-8")
         
         # Add inventory
         for line in self.getInventoryCode():

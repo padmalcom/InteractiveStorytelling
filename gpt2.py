@@ -89,6 +89,11 @@ class GPT2:
             else:
                 self.tokenizer = AutoTokenizer.from_pretrained("gpt2-xl")
                 self.model = AutoModelWithLMHead.from_pretrained("gpt2-xl")
+
+            #add pad token
+            self.tokenizer.pad_token = '<PAD>'
+            self.model.resize_token_embeddings(len(self.tokenizer))
+            
             self.model.to(self.device)
             self.model.eval()
             self.temperature = 1.0
