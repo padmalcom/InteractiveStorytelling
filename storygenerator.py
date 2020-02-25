@@ -45,9 +45,10 @@ class StoryGenerator():
         self.text = ""
         self.html = "<html><body>"
         self.HTML_END = "</body></html>"
-        self.gpt2 = GPT2(1, dummy=False)
+        self.gpt2 = GPT2(3)
         self.USE_NOUNS = True
-        self.MAX_ACTIONS = 3
+        self.LIMIT_NOUNS_BY_SYNSETS = False
+        self.MAX_ACTIONS = 12
         self.actionTemplates = ActionTemplates()
         self.acceptedNouns = ["noun.animal", "noun.artifact", "noun.food", "noun.plant", "noun.object"] 
         #self.bigramModel = None
@@ -335,10 +336,15 @@ class StoryGenerator():
                 if token.pos_ == 'NOUN':
 
                     # Only allow man made objects
-                    for synset in wn.synsets(token.text):
-                        if ((synset.lexname() in self.acceptedNouns) and (not token.text in self.nouns_in_paragraph)):
-                            print("type: " + synset.lexname() + " value: " + token.text)
-                            self.nouns_in_paragraph.append(token.text)
+                    if (self.LIMIT_NOUNS_BY_SYNSETS == False) and (not token.text in self.nouns_in_paragraph):
+                        print("Adding noun " + token.text + " anyway since we ignore synset matching.")
+                        self.nouns_in_paragraph.append(token.text)
+
+                    else:
+                        for synset in wn.synsets(token.text):
+                            if ((synset.lexname() in self.acceptedNouns) and (not token.text in self.nouns_in_paragraph)):
+                                print("type: " + synset.lexname() + " value: " + token.text)
+                                self.nouns_in_paragraph.append(token.text)
 
     def highlightEntities(self, text):
         for person in self.people_in_paragraph:
@@ -368,8 +374,6 @@ class StoryGenerator():
                 probability = self.getProbability(action_sentence)
                 if self.PRIORIZE_COMBINATIONS:
                     probability = -sys.float_info.max
-                #probability = self.getProbability(action_sentence)
-                #probability = self.getVerbNounProbability(action, place) # 
                 all_actions.append({"type":"combination", "action":"combine", "entity":combination.returnItem.name, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for item in self.inventory:
@@ -378,8 +382,6 @@ class StoryGenerator():
             probability = self.getProbability(simple_action)
             if self.PRIORIZE_ITEM_USAGE:
                 probability = -sys.float_info.max            
-            #probability = self.getProbability(action_sentence)
-            #probability = self.getVerbNounProbability(action, item)
             all_actions.append({"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
             print(all_actions[-1])
 
@@ -389,8 +391,6 @@ class StoryGenerator():
             for action in actions:
                 simple_action, action_sentence = self.getActionTemplates(action, person)
                 probability = self.getProbability(simple_action)
-                #probability = self.getProbability(action_sentence)
-                #probability = self.getVerbNounProbability(action, person)
                 all_actions.append({"type":"person", "action":action, "entity":person, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for place in self.places_in_paragraph:
@@ -398,8 +398,6 @@ class StoryGenerator():
             for action in actions:                  
                 simple_action, action_sentence = self.getActionTemplates(action, place)
                 probability = self.getProbability(simple_action)
-                #probability = self.getProbability(action_sentence)
-                #probability = self.getVerbNounProbability(action, place)
                 all_actions.append({"type":"place", "action":action, "entity":place, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for event in self.events_in_paragraph:
@@ -407,8 +405,6 @@ class StoryGenerator():
             for action in actions:
                 simple_action, action_sentence = self.getActionTemplates(action, event)
                 probability = self.getProbability(simple_action)
-                #probability = self.getProbability(action_sentence)
-                #probability = self.getVerbNounProbability(action, event)
                 all_actions.append({"type":"event", "action":action, "entity":event, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for item in self.items_in_paragraph:
@@ -416,8 +412,6 @@ class StoryGenerator():
             for action in actions:
                 simple_action, action_sentence = self.getActionTemplates(action, item)
                 probability = self.getProbability(simple_action)
-                #probability = self.getProbability(action_sentence)
-                #probability = self.getVerbNounProbability(action, item)
                 all_actions.append({"type":"item", "action":action, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         if (self.USE_NOUNS):
@@ -426,12 +420,10 @@ class StoryGenerator():
                 for action in actions:
                     simple_action, action_sentence = self.getActionTemplates(action, noun)
                     probability = self.getProbability(simple_action)
-                    #probability = self.getProbability(action_sentence)
-                    #probability = self.getVerbNounProbability(action, noun)
                     all_actions.append({"type":"noun", "action":action, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         print("Found " + str(len(all_actions)) + " actions.")
-        sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
+        sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"), reverse=True)
 
         if (self.MAX_ACTIONS > -1):
             sorted_actions = sorted_actions[:self.MAX_ACTIONS]
