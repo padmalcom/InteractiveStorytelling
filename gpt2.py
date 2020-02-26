@@ -81,16 +81,29 @@ def sample_sequence(
 
 
 class GPT2:
-    def __init__(self, config):
-        #self.num_words = config.get("num_words", 20)
-        #self.device = config.get("device", "cpu")
+    def __init__(self, model_scale):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
 
-        model = GPT2LMHeadModel.from_pretrained("distilgpt2")
-        model.eval()
-        model.to(self.device)
-        self.model = model
+        #self.tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        #self.model = GPT2LMHeadModel.from_pretrained("distilgpt2")
+        if model_scale == 0:
+            self.tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+            self.model = GPT2LMHeadModel.from_pretrained("distilgpt2")
+        elif model_scale == 1:
+            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+            self.model = GPT2LMHeadModel.from_pretrained("gpt2")
+        elif model_scale == 2:
+            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-medium")
+            self.model = GPT2LMHeadModel.from_pretrained("gpt2-medium")
+        elif model_scale == 3:
+            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-large")
+            self.model = GPT2LMHeadModel.from_pretrained("gpt2-large")
+        else:
+            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-xl")
+            self.model = GPT2LMHeadModel.from_pretrained("gpt2-xl")
+        
+        self.model.eval()
+        self.model.to(self.device)
 
     def generate_texts(self, prefix, length, num_samples):
         indexed_tokens = self.tokenizer.encode(prefix)
@@ -100,11 +113,9 @@ class GPT2:
         )
 
     def generate_text(self, prefix, length):
-        texts = self.generate_texts(prefix, length, 1)
-        print("Here")
-        print(texts)
-        if (len(texts) > 0):
-            return texts[0]
+        text = self.generate_texts(prefix, length, 1)
+        if (len(text) > len(prefix)):
+            return text[len(prefix):]
         else:
             return ""
 

@@ -1,14 +1,19 @@
 import random
 
 class ActionTemplates:
-    def getTemplate(self, action, player, entity):
+    def getTemplate(self, action, player, entity, entity_type):
         template = random.choice(actiontemplates[action])
-        longaction = template.replace("[name]", player).replace("[object]", entity)
-        simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", entity)
+        if (entity_type == "PERSON"):
+            longaction = template.replace("[name]", player).replace("[object]", entity)
+            simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", entity)
+        else:
+            longaction = template.replace("[name]", player).replace("[object]", "the" + entity)
+            simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", "the" + entity)            
         return simpleaction, longaction
 
 actiontemplates = {
     "take" : ["Taking the [object] in both hands [name] stood there gratefully.", "[name] took the [object] with pride and smiled.", "Disgusted, [name] took the [object] from its place.", "[name] took the [object] without hesistation."],
+    "talk to" : ["[name] spoke to [object].", "[name] took [object] aside and silently began to speak.", "[name] yelled at [object]."],
     "compliment":["[name] shyly complimented [object].", "Ironically, [name] complimented [object]."],
     "insult":["[name] insulted [object] in the worst possible way.", "[name] said [object] was the dumbest creature living under the sun."],
     "look at":["[name] looked at [object] carefully.", "With an irrepressible curiosity, [name] looked at [object]."],
@@ -26,6 +31,7 @@ actiontemplates = {
 
 simpleactions = {
     "take":"[name] takes the [object].",
+    "talk to":"[name] spoke to [object].",
     "compliment":"[name] compliments [object].",
     "insult":"[name] insults [object].",
     "look at":"[name] looks at [object].",

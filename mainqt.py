@@ -152,7 +152,7 @@ class InteractiveStoryUI(object):
             end = self.storyGenerator.generateEnd()
             self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence + " " + end
 
-            trucated_text = self.storyGenerator.truncateLastSentences(200)
+            trucated_text = self.storyGenerator.truncateLastSentences(self.storyGenerator.TRUCATED_LAST_TEXT)
             new_text = self.storyGenerator.generateText(trucated_text)
 
             self.storyGenerator.paragraph = new_text
@@ -176,7 +176,7 @@ class InteractiveStoryUI(object):
         # Create a normal paragraph
         else:
             # generate next paragraph
-            trucated_text = self.storyGenerator.truncateLastSentences(200)
+            trucated_text = self.storyGenerator.truncateLastSentences(self.storyGenerator.TRUCATED_LAST_TEXT)
             new_text = self.storyGenerator.generateText(trucated_text)
             self.storyGenerator.paragraph = action_sentence + " " + new_text
             self.storyGenerator.all_paragraphs.append(action_sentence + " " + new_text)
