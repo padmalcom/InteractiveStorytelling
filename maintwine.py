@@ -7,6 +7,7 @@ from storygenerator import StoryGenerator
 from collections import Counter, defaultdict
 import sys
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 class TwineGenerator():
     def __init__(self):
@@ -14,8 +15,11 @@ class TwineGenerator():
         self.storyGenerator = StoryGenerator()
         self.action_buttons = []
         self.inventory_labels = []
+        self.out_path = ""
 
         self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
+
+        print("Initialization done.")
 
     def reset(self):
         self.storyGenerator.reset()
@@ -47,11 +51,40 @@ class TwineGenerator():
 
         self.storyGenerator.setting_id = random.randrange(0, len(self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions))
         self.storyGenerator.setting_id = 0 # temporary
-        self.storyGenerator.paragraph = self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions[self.storyGenerator.setting_id]
+
+        all_paragraphs = []
+        paragraph_coherences = []
+
+        inventory = []
+
+        # Where is the story stored?
+        self.out_path = r"C:/Users/admin/" + datetime.now().strftime("story_%d.%m.%Y_%H-%M-%S")+ "_para" + str(self.storyGenerator.paragraphs)
+        if os.path.exists(self.out_path):
+            print("Story directory already exists. Exiting")
+        else:
+            os.mkdir(self.out_path)
+        
+        # do not use self.storyGenerator.paragraph since we are in a tree structure
+        paragraph = self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions[self.storyGenerator.setting_id]
+
+        paragraph = paragraph.replace("[name]", self.storyGenerator.name)
+        all_paragraphs.append(paragraph)
+        coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
+        paragraph_coherences.append(coh)
+        print("Coherence is: " + str(coh))
+
+        # Plot coherence graph
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        fig.set_size_inches(4.0, 3.0)
+        ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
+        ax.set_xlabel("Paragraph")
+        ax.set_ylabel("Coherence")
+        fig.savefig(self.out_path + r"/plt" + str(len(paragraph_coherences)) + ".png")
+        plt.close(fig)
 
         # Open file to write
-        out_file = datetime.now().strftime("story_%m.%d.%Y_%H-%M-%S.tw2")
-        f = open("C:/Users/admin/" + out_file, "w", encoding="utf-8")
+        absolute_path = self.out_path + r"/story.tw2"
+        f = open(absolute_path, "w", encoding="utf-8")
         
         # Add inventory
         for line in self.getInventoryCode():
@@ -59,33 +92,35 @@ class TwineGenerator():
                     
         # Write start
         f.write("::StoryTitle\n")
-        f.write("<<initInv>>")
+
         f.write("A " + self.storyGenerator.setting + " story\n")
         f.writelines(["\n", "::Configuration [twee2]\n","Twee2::build_config.story_ifid = '7870917a-11c5-4bb8-a945-c810834c8229'\n","Twee2::build_config.story_format = 'SugarCube2'\n", "\n"])
 
+
         # Write start
-        self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
-        self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
-        self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
-        self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
-
-        self.recursivelyContinue(f, self.storyGenerator.paragraph, self.storyGenerator.html_paragraph, self.storyGenerator.inventory, "1", 0, self.EMPTY_ACTION)
-
+        self.storyGenerator.extractEntities(paragraph)
+        html_paragraph = paragraph
+        html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
+        html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+        
+        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 0, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
 
         f.write("The end\n")
         f.close()
         end_time = datetime.now()
-        second_diff = (start_time - end_time).total_seconds()
-        print("duration in seconds: " + str(second_diff))
+        second_diff = (end_time - start_time).total_seconds()
+        print("Started at " + str(start_time) + ", ended at " + str(end_time) + ", duration in seconds: " + str(second_diff))
+        os.rename(self.out_path, self.out_path + "_done_in_" + str(second_diff))
 
 
-    def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action):
+    def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences):
 
         print("Depth " + str(depth) + " of " + str(self.storyGenerator.paragraphs))
 
         # generate twine paragraph id
         if twineid == "1":
             f.write("::Start\n")
+            f.write("<<initInv>>")
             f.write(html)
         else:
             f.write("::" + str(twineid) + "\n")
@@ -93,12 +128,41 @@ class TwineGenerator():
         # end reached?
         if (depth == self.storyGenerator.paragraphs):
             end = self.storyGenerator.generateEnd()
-            self.storyGenerator.text = self.storyGenerator.text + " " + action["sentence"] + " " + end
-            trucated_text = self.storyGenerator.truncateLastSentences(200)
-            new_text = self.storyGenerator.generateText(trucated_text)
+            text = text + " " + action["sentence"] + " " + end
+            truncated_text = self.storyGenerator.truncateLastSentences(text, self.storyGenerator.TRUCATED_LAST_TEXT)
+            try:
+                new_text = self.storyGenerator.generateText(truncated_text)
+            except:
+                print("0 Generation error on truncated_text: '" + truncated_text + "'")
+                new_text = ""
             paragraph = action["sentence"] + " " + end + " " + new_text
+            
+            # coherence
+            all_paragraphs.append(new_text)
+            coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
+            paragraph_coherences.append(coh)
+            print("Coherence is: " + str(coh))
+
+            # Plot coherence graph
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            fig.set_size_inches(4.0, 3.0)
+            ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
+            ax.set_xlabel("Paragraph")
+            ax.set_ylabel("Coherence")
+            fig.savefig(self.out_path + r"/plt" + str(twineid) + ".png")
+            plt.close(fig)
+
             self.storyGenerator.extractEntities(paragraph)
             html_paragraph = paragraph
+
+            # highlight entities and names
+            html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
+            html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+
+            # finally append entire text
+            text = text + " " + paragraph
+            html = html + " " + html_paragraph
+
             f.write(html_paragraph + "\n<b>THE END</b>\n")
             return
   
@@ -115,18 +179,38 @@ class TwineGenerator():
 
         # generate next paragraph
         #self.storyGenerator.text = text
-        self.storyGenerator.text = text + action["sentence"]
-        trucated_text = self.storyGenerator.truncateLastSentences(200)
-        new_text = self.storyGenerator.generateText(trucated_text)
+        text = text + " " + action["sentence"]
+        truncated_text = self.storyGenerator.truncateLastSentences(text, self.storyGenerator.TRUCATED_LAST_TEXT)
+        try:
+            new_text = self.storyGenerator.generateText(truncated_text)
+        except:
+            print("1 Generation error on truncated_text: '" + truncated_text + "'")
+            new_text = ""
+
         #paragraph = action["sentence"] + " " + new_text
         paragraph = action["sentence"] + " " +new_text
+
+        all_paragraphs.append(new_text)
+        coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
+        paragraph_coherences.append(coh)
+        print("Coherence is: " + str(coh))
+
+        # Plot coherence graph
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        fig.set_size_inches(4.0, 3.0)
+        ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
+        ax.set_xlabel("Paragraph")
+        ax.set_ylabel("Coherence")
+        image_path = self.out_path + r"/plt" + str(twineid) + ".png"
+        fig.savefig(image_path)
+        plt.close(fig)  
 
         # extract entities
         self.storyGenerator.extractEntities(paragraph)
 
         html_paragraph = paragraph
 
-        f.write(html_paragraph + "\n")
+        f.write(html_paragraph + "\n<img src=\"plt" + str(twineid) + ".png\"><br>")
 
         # Generate links
         actions = self.storyGenerator.generateActions()
@@ -137,10 +221,10 @@ class TwineGenerator():
         f.write("[[continue->" + twineid + "_" + str(len(actions))+"]]\n\n")
         for idx, action in enumerate(actions):
             # generate target for each action
-            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action)
+            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy())
 
         # generate continue paragraph
-        self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION)
+        self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy())
 
 if __name__ == '__main__':
     tg = TwineGenerator()

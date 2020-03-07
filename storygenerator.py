@@ -37,6 +37,7 @@ class StoryGenerator():
         self.nouns_in_paragraph = []
         self.current_paragraphs = 0 # Tract current paractraph
         self.all_paragraphs = []
+        self.paragraph_coherences = []
         self.name = ""
         self.party1 = "John"
         self.party2 = "Sally"
@@ -45,7 +46,7 @@ class StoryGenerator():
         self.text = ""
         self.html = "<html><body>"
         self.HTML_END = "</body></html>"
-        self.gpt2 = GPT2(4)
+        self.gpt2 = GPT2(1)
         self.USE_NOUNS = True
         self.LIMIT_NOUNS_BY_SYNSETS = True
         self.MAX_ACTIONS = 4
@@ -61,6 +62,7 @@ class StoryGenerator():
         self.PRIORIZE_DIALOG = True
         self.AVOID_SIMILAR_NOUNS = False # This one is buggy as hell
         self.TRUCATED_LAST_TEXT = 300
+        self.GENERATED_TEXT_LENGTH = 200
         self.gender = gender.Detector()
         self.coherence = Coherence()
         
@@ -131,8 +133,9 @@ class StoryGenerator():
         simpleaction, extaction = self.actionTemplates.getTemplate(action, self.name, entity, entity_type)
         return simpleaction, extaction
 
-    def calculateParagraphCoherence(self):
-        return self.coherence.calculateCoherence(self.all_paragraphs)
+    def calculateParagraphCoherence(self, paragraphs):
+        c = self.coherence.calculateCoherence(paragraphs)
+        return c
 
     def getProbability(self, sentence):
         return self.gpt2.score_probability(sentence)
@@ -227,8 +230,8 @@ class StoryGenerator():
                 result.append(sentence)
         return result
 
-    def truncateLastSentences(self, characters):
-        sentences = self.splitSentences(self.text, False)
+    def truncateLastSentences(self, text, characters):
+        sentences = self.splitSentences(text, False)
         result = ""
         for sentence in reversed(sentences):
             if (len(result) > characters):
@@ -253,7 +256,7 @@ class StoryGenerator():
         return s
 
     def generateText(self, history):
-        text = self.gpt2.generate_text(history, 100)
+        text = self.gpt2.generate_text(history, self.GENERATED_TEXT_LENGTH)
         sentences = self.splitSentences(text, False)
         # Add information about existing item
         addinfo = ""

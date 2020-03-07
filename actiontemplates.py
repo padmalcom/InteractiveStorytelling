@@ -7,8 +7,8 @@ class ActionTemplates:
             longaction = template.replace("[name]", player).replace("[object]", entity)
             simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", entity)
         else:
-            longaction = template.replace("[name]", player).replace("[object]", "the" + entity)
-            simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", "the" + entity)            
+            longaction = template.replace("[name]", player).replace("[object]", entity)
+            simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", entity)            
         return simpleaction, longaction
 
 actiontemplates = {

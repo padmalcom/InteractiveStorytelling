@@ -6,7 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import torch
 import torch.nn.functional as F
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
+#from transformers import GPT2Tokenizer, GPT2LMHeadModel
+from transformers import AutoTokenizer, AutoModelWithLMHead
 from tqdm import trange
 import math
 import nltk
@@ -87,35 +88,43 @@ class GPT2:
         #self.tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
         #self.model = GPT2LMHeadModel.from_pretrained("distilgpt2")
         if model_scale == 0:
-            self.tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
-            self.model = GPT2LMHeadModel.from_pretrained("distilgpt2")
+            self.tokenizer = AutoTokenizer.from_pretrained("distilgpt2")
+            self.model = AutoModelWithLMHead.from_pretrained("distilgpt2")
         elif model_scale == 1:
-            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-            self.model = GPT2LMHeadModel.from_pretrained("gpt2")
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            self.model = AutoModelWithLMHead.from_pretrained("gpt2")
         elif model_scale == 2:
-            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-medium")
-            self.model = GPT2LMHeadModel.from_pretrained("gpt2-medium")
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+            self.model = AutoModelWithLMHead.from_pretrained("gpt2-medium")
         elif model_scale == 3:
-            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-large")
-            self.model = GPT2LMHeadModel.from_pretrained("gpt2-large")
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2-large")
+            self.model = AutoModelWithLMHead.from_pretrained("gpt2-large")
         else:
-            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2-xl")
-            self.model = GPT2LMHeadModel.from_pretrained("gpt2-xl")
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2-xl")
+            self.model = AutoModelWithLMHead.from_pretrained("gpt2-xl")
         
         self.model.eval()
         self.model.to(self.device)
 
     def generate_texts(self, prefix, length, num_samples):
-        indexed_tokens = self.tokenizer.encode(prefix)
-        output = sample_sequence(self.model, length=length, context=indexed_tokens, num_samples=num_samples,device=self.device)
-        return self.tokenizer.decode(
-            output[0, 0:].tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
-        )
+        #indexed_tokens = self.tokenizer.encode(prefix)
+        #output = sample_sequence(self.model, length=length, context=indexed_tokens, num_samples=num_samples,device=self.device)
+        #return self.tokenizer.decode(
+        #    output[0, 0:].tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
+        #)
+        input_ids = torch.tensor(self.tokenizer.encode(prefix), device=self.device).unsqueeze(0)
+        outputs = self.model.generate(max_length=length, num_beams=5, input_ids=input_ids, bos_token_id=self.tokenizer.bos_token_id, eos_token_ids=self.tokenizer.eos_token_id, num_return_sequences=num_samples)
+        result = []
+        for i in range(num_samples):
+            text = self.tokenizer.decode(outputs[i], skip_special_tokens=True)
+            result.append(text)
+            print(text)
+        return result
 
     def generate_text(self, prefix, length):
-        text = self.generate_texts(prefix, length, 1)
-        if (len(text) > len(prefix)):
-            return text[len(prefix):]
+        texts = self.generate_texts(prefix, length, 1)
+        if (len(texts[0]) > len(prefix)):
+            return texts[0][len(prefix):]
         else:
             return ""
 

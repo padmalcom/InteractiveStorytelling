@@ -5,6 +5,7 @@ import random
 import os
 from storygenerator import StoryGenerator
 from collections import Counter, defaultdict
+import matplotlib.pyplot as plt
 
 # pyqt5
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -152,12 +153,20 @@ class InteractiveStoryUI(object):
             end = self.storyGenerator.generateEnd()
             self.storyGenerator.text = self.storyGenerator.text + " " + action_sentence + " " + end
 
-            trucated_text = self.storyGenerator.truncateLastSentences(self.storyGenerator.TRUCATED_LAST_TEXT)
+            trucated_text = self.storyGenerator.truncateLastSentences(self.storyGenerator.text, self.storyGenerator.TRUCATED_LAST_TEXT)
             new_text = self.storyGenerator.generateText(trucated_text)
 
             self.storyGenerator.paragraph = new_text
             self.storyGenerator.all_paragraphs.append(new_text)
-            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
+            coh = self.storyGenerator.calculateParagraphCoherence(self.storyGenerator.all_paragraphs)
+            self.storyGenerator.paragraph_coherences.append(coh)
+            print("Coherence is: " + str(coh))
+
+            # Plot coherence graph
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(self.storyGenerator.paragraph_coherences)), self.storyGenerator.paragraph_coherences)
+            fig.savefig("C:\\Users\\admin\\Desktop\\plt" + str(len(self.storyGenerator.paragraph_coherences)) + ".png")
+            plt.close(fig)
 
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
@@ -176,11 +185,20 @@ class InteractiveStoryUI(object):
         # Create a normal paragraph
         else:
             # generate next paragraph
-            trucated_text = self.storyGenerator.truncateLastSentences(self.storyGenerator.TRUCATED_LAST_TEXT)
+            trucated_text = self.storyGenerator.truncateLastSentences(self.storyGenerator.text, self.storyGenerator.TRUCATED_LAST_TEXT)
+            print(trucated_text)
             new_text = self.storyGenerator.generateText(trucated_text)
             self.storyGenerator.paragraph = action_sentence + " " + new_text
             self.storyGenerator.all_paragraphs.append(action_sentence + " " + new_text)
-            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
+            coh = self.storyGenerator.calculateParagraphCoherence(self.storyGenerator.all_paragraphs)
+            self.storyGenerator.paragraph_coherences.append(coh)
+            print("Coherence is: " + str(coh))
+
+            # Plot coherence graph
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(self.storyGenerator.paragraph_coherences)), self.storyGenerator.paragraph_coherences)
+            fig.savefig("C:\\Users\\admin\\Desktop\\plt" + str(len(self.storyGenerator.paragraph_coherences)) + ".png")
+            plt.close(fig)
 
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
@@ -264,63 +282,43 @@ class InteractiveStoryUI(object):
         self.storyGenerator.setting_id = 0 # temporary
         self.storyGenerator.paragraph = self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions[self.storyGenerator.setting_id]
 
-        if self.storyGenerator.current_paragraphs < self.storyGenerator.paragraphs:
+        # Replace [name]
+        self.storyGenerator.paragraph = self.storyGenerator.paragraph.replace("[name]", self.storyGenerator.name)
+        self.storyGenerator.all_paragraphs.append(self.storyGenerator.paragraph)
+        coh = self.storyGenerator.calculateParagraphCoherence(self.storyGenerator.all_paragraphs)
+        self.storyGenerator.paragraph_coherences.append(coh)
+        print("Coherence is: " + str(coh))
 
-            # Replace [name]
-            self.storyGenerator.paragraph = self.storyGenerator.paragraph.replace("[name]", self.storyGenerator.name)
-            self.storyGenerator.all_paragraphs.append(self.storyGenerator.paragraph)
-            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
+        # Plot coherence graph
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        ax.plot(range(0,len(self.storyGenerator.paragraph_coherences)), self.storyGenerator.paragraph_coherences)
+        fig.savefig("C:\\Users\\admin\\Desktop\\plt" + str(len(self.storyGenerator.paragraph_coherences)) + ".png")
+        plt.close(fig)
 
-            self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
+        self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
 
-            # temporary element to be appended to html and text
-            self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
+        # temporary element to be appended to html and text
+        self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
 
-            # 5.1 Clean up buttons and create new
-            self.createButtons()
+        # 5.1 Clean up buttons and create new
+        self.createButtons()
 
-            # Highlight entities
-            self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
+        # Highlight entities
+        self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
 
-            # append paragraph
-            self.storyGenerator.text = self.storyGenerator.text + " " + self.storyGenerator.paragraph
+        # append paragraph
+        self.storyGenerator.text = self.storyGenerator.text + " " + self.storyGenerator.paragraph
 
-            # highlight player name
-            self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+        # highlight player name
+        self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
 
-            # append html and highlight
-            temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
-            self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
-            ui.textEdit.setHtml(temp_html + self.storyGenerator.HTML_END)
+        # append html and highlight
+        temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
+        self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
+        ui.textEdit.setHtml(temp_html + self.storyGenerator.HTML_END)
 
-            # 11. Increase paragraph counter
-            self.storyGenerator.current_paragraphs += 1
-
-        else:
-            end = self.storyGenerator.generateEnd()
-            self.storyGenerator.text = self.storyGenerator.text + " " + end
-
-            trucated_text = self.storyGenerator.truncateLastSentences(200)
-            new_text = self.storyGenerator.generateText(trucated_text)
-
-            self.storyGenerator.paragraph = new_text
-            self.storyGenerator.all_paragraphs.append(new_text)
-            print("Coherence is: " + str(self.storyGenerator.calculateParagraphCoherence()))
-
-            # extract entities
-            self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
-
-            self.storyGenerator.html_paragraph = self.storyGenerator.paragraph
-            
-            self.storyGenerator.html_paragraph = self.storyGenerator.highlightEntities(self.storyGenerator.html_paragraph)
-            self.storyGenerator.html_paragraph = self.storyGenerator.html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
-
-            # append html and text
-            self.storyGenerator.text = self.storyGenerator.text + self.storyGenerator.paragraph
-            temp_html = self.storyGenerator.html + " <span style=\"background-color: #FFFF00\">" + self.storyGenerator.html_paragraph + "</span>"
-            self.storyGenerator.html = self.storyGenerator.html + " " + self.storyGenerator.html_paragraph
-            ui.textEdit.setHtml(temp_html + "<br><b>THE END</b>" + self.storyGenerator.HTML_END)
-
+        # 11. Increase paragraph counter
+        self.storyGenerator.current_paragraphs += 1
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
