@@ -17,6 +17,9 @@ class TwineGenerator():
         self.inventory_labels = []
         self.out_path = ""
 
+        self.total_nodes = 0
+        self.current_node = 0
+
         self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
 
         print("Initialization done.")
@@ -103,7 +106,9 @@ class TwineGenerator():
         html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
         
-        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 0, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
+        self.current_node = 1
+        self.total_nodes = self.storyGenerator.MAX_ACTIONS ** self.storyGenerator.paragraphs
+        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
 
         f.write("The end\n")
         f.close()
@@ -124,6 +129,9 @@ class TwineGenerator():
             f.write(html)
         else:
             f.write("::" + str(twineid) + "\n")
+
+        self.current_node += 1
+        print("Calculating node " + str(self.current_node) + "/" + str(self.total_nodes) + "...")
 
         # end reached?
         if (depth == self.storyGenerator.paragraphs):
