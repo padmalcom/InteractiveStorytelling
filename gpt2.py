@@ -85,6 +85,8 @@ class GPT2:
     def __init__(self, model_scale):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        print("Device is " + str(self.device))
+
         #self.tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
         #self.model = GPT2LMHeadModel.from_pretrained("distilgpt2")
         if model_scale == 0:

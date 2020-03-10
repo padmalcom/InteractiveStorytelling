@@ -22,6 +22,8 @@ class TwineGenerator():
 
         self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
 
+        self.BERT_ACTIONS = True
+
         print("Initialization done.")
 
     def reset(self):
@@ -106,8 +108,8 @@ class TwineGenerator():
         html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
         
-        self.current_node = 1
-        self.total_nodes = self.storyGenerator.MAX_ACTIONS ** self.storyGenerator.paragraphs
+        self.current_node = 0
+        self.total_nodes = 2 * (self.storyGenerator.MAX_ACTIONS ** (self.storyGenerator.paragraphs-1)) - 1
         self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
 
         f.write("The end\n")
@@ -221,7 +223,10 @@ class TwineGenerator():
         f.write(html_paragraph + "\n<img src=\"plt" + str(twineid) + ".png\"><br>")
 
         # Generate links
-        actions = self.storyGenerator.generateActions()
+        if self.BERT_ACTIONS == True:
+            actions = self.storyGenerator.generateActionsBert()
+        else:
+            actions = self.storyGenerator.generateActions()
         for idx, action in enumerate(actions):
             f.write("[[" + action["simple"] + "->" + twineid + "_" + str(idx) +"]]\n")
 

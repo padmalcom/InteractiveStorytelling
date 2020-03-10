@@ -11,6 +11,12 @@ class ActionTemplates:
             simpleaction = simpleactions[action].replace("[name]", player).replace("[object]", entity)            
         return simpleaction, longaction
 
+    def getUniversalTemplate(self, action, player, entity, entity_type):
+        template = random.choice(universalactiontemplates)
+        longaction = template.replace("[name]", player).replace("[object]", entity).replace("[predicate]", action)
+        simpleaction = player + " " + action + " the " + entity + "."
+        return simpleaction, longaction
+
 actiontemplates = {
     "take" : ["Taking the [object] in both hands [name] stood there gratefully.", "[name] took the [object] with pride and smiled.", "Disgusted, [name] took the [object] from its place.", "[name] took the [object] without hesistation."],
     "talk to" : ["[name] spoke to [object].", "[name] took [object] aside and silently began to speak.", "[name] yelled at [object]."],
@@ -28,6 +34,14 @@ actiontemplates = {
      "talk to":["[name] decided to talk to [object].", "\"Hey, [object], I want to talk\", said [name]."],
      "use from inventory":["[name] used the [object] from the inventory.", "[name] pulled out the [object] from the bag and used it."]
 }
+
+universalactiontemplates = [
+    "[name] carefully [predicate] the [object].",
+    "At first, [name] stood there for minutes before [predicate]ing the [object].",
+    "With a mean smile, [name] [predicate] the [object].",
+    "It took [name] like forever to [predicate] the [object]."
+
+]
 
 simpleactions = {
     "take":"[name] takes the [object].",
