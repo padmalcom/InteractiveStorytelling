@@ -376,6 +376,8 @@ class StoryGenerator():
         all_actions = []
 
         for person in self.people_in_paragraph:
+            print(self.bert)
+            print(person)
             predicate, probability = self.bert.getBestPredicateAndProbability("He", person)
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, person, "PERSON")
             if self.PRIORIZE_DIALOG:
@@ -388,19 +390,19 @@ class StoryGenerator():
 
                 targetItem, probability = self.bert.combineTo(combination.items[0], combination.items[1])
                 action_sentence = self.name + " combined the " + combination.items[0] + " and the " + combination.items[1] + " to a " + targetItem
-                simple_action = targetItem
+                simple_action = "combine " + combination.items[0] + " and " + combination.items[1]
                 if self.PRIORIZE_COMBINATIONS:
                     probability = -sys.float_info.max
                 all_actions.append({"type":"combination", "action":"combine", "entity":targetItem, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for item in self.inventory:
-            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + item + " from the inventory.")
+            #predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + item + " from the inventory.")
             print("item in inv: " + item)
-            simple_action = self.name + " " + predicate + " the " + item + " from the inventory."
-            action_sentence = simple_action
+            simple_action = "use " + item + " from inventory."
+            action_sentence = self.name + " used the " + item + " from the inventory."
             if self.PRIORIZE_ITEM_USAGE:
                 probability = -sys.float_info.max            
-            all_actions.append({"type":"item_from_inventory", "action":predicate, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
             print(all_actions[-1])
 
         for place in self.places_in_paragraph:

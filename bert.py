@@ -8,12 +8,13 @@ class Bert:
         self.nlp = pipeline('fill-mask')
     
     def getBestPredicateAndProbability(self, subj, obj):
-        res = self.nlp(subj + " <mask> " + obj)
+        res = self.nlp(subj + " <mask> " + obj + ".")
         for r in res:
             sentence = r['sequence'].replace("<s>", "").replace("</s>", "")
             words = nltk.word_tokenize(sentence)
             print(words)
             for i in range(len(words)):
+                print("word " + str(i) + ": " + words[i])
                 if words[i] == subj and i<len(words):
                     return words[i+1], r['score']
 

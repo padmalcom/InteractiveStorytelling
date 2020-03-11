@@ -30,13 +30,18 @@ class TwineGenerator():
         self.storyGenerator.reset()
         
     def getInventoryCode(self):
-        return ["window.getInv = function() {return state.active.variables.inventory;}",
+        return ["::MacroPassage[script]"
+            "window.getInv = function() {return state.active.variables.inventory;}",
             "macros.initInv = {handler: function(place, macroName, params, parser) {state.active.variables.inventory = [];}};",
             "macros.addToInv = {handler: function(place, macroName, params, parser) {if (params.length == 0) {throwError(place, \"<<\" + macroName + \">>: no parameters given\");return;}    if (state.active.variables.inventory.indexOf(params[0]) == -1) {state.active.variables.inventory.push(params[0]);}}};",
             "macros.removeFromInv = {handler: function(place, macroName, params, parser) {if (params.length == 0) {throwError(place, \"<<\" + macroName + \">>: no parameters given\"); return;} var index = state.active.variables.inventory.indexOf(params[0]); if (index != -1) {state.active.variables.inventory.splice(index, 1);}}};",
             "macros.inv = {handler: function(place, macroName, params, parser) {if (state.active.variables.inventory.length == 0) {new Wikifier(place, 'nothing');} else {new Wikifier(place, state.active.variables.inventory.join(','));}}};",
             "macros.invWithLinks = {handler: function(place, macroName, params, parser) {if (state.active.variables.inventory.length == 0) {new Wikifier(place, 'nothing');} else {new Wikifier(place, '[[' + state.active.variables.inventory.join(']]<br>[[') + ']]');}}};",
-            "macros.emptyInv = {handler: function(place, macroName, params, parser) {state.active.variables.inventory = []}};"]            
+            "macros.emptyInv = {handler: function(place, macroName, params, parser) {state.active.variables.inventory = []}};",
+            "",
+            "::StoryCaption",
+            "<<invWithLinks>>",
+            ""]            
 
     def start(self):
 
@@ -53,6 +58,7 @@ class TwineGenerator():
         self.storyGenerator.party1 = input("Type a name of a party member: ")
         self.storyGenerator.party2 = input("Type the name of another member: ")
         self.storyGenerator.paragraphs = int(input("Enter a number of paragraphs: "))
+        self.storyGenerator.MAX_ACTIONS = int(input("Enter the number of actions in a paragraph: "))
 
         self.storyGenerator.setting_id = random.randrange(0, len(self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions))
         self.storyGenerator.setting_id = 0 # temporary
@@ -80,7 +86,6 @@ class TwineGenerator():
 
         # Plot coherence graph
         fig, ax = plt.subplots(nrows=1, ncols=1)
-        fig.set_size_inches(4.0, 3.0)
         ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
         ax.set_xlabel("Paragraph")
         ax.set_ylabel("Coherence")
@@ -109,7 +114,9 @@ class TwineGenerator():
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
         
         self.current_node = 0
-        self.total_nodes = 2 * (self.storyGenerator.MAX_ACTIONS ** (self.storyGenerator.paragraphs-1)) - 1
+        # (N^L-1) / (N-1)
+        self.total_nodes = (self.storyGenerator.MAX_ACTIONS ** self.storyGenerator.paragraphs-1) / ((self.storyGenerator.MAX_ACTIONS-1) + 0.00000001)
+        #self.total_nodes = 2 * (self.storyGenerator.MAX_ACTIONS ** (self.storyGenerator.paragraphs-1)) - 1
         self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
 
         f.write("The end\n")
@@ -155,7 +162,6 @@ class TwineGenerator():
 
             # Plot coherence graph
             fig, ax = plt.subplots(nrows=1, ncols=1)
-            fig.set_size_inches(4.0, 3.0)
             ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
             ax.set_xlabel("Paragraph")
             ax.set_ylabel("Coherence")
@@ -207,7 +213,6 @@ class TwineGenerator():
 
         # Plot coherence graph
         fig, ax = plt.subplots(nrows=1, ncols=1)
-        fig.set_size_inches(4.0, 3.0)
         ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
         ax.set_xlabel("Paragraph")
         ax.set_ylabel("Coherence")

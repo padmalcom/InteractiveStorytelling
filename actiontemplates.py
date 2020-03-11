@@ -13,8 +13,12 @@ class ActionTemplates:
 
     def getUniversalTemplate(self, action, player, entity, entity_type):
         template = random.choice(universalactiontemplates)
-        longaction = template.replace("[name]", player).replace("[object]", entity).replace("[predicate]", action)
-        simpleaction = player + " " + action + " the " + entity + "."
+        if (entity_type == "PERSON"):
+            simpleaction = action + " " + entity + "."
+            longaction = template.replace("[name]", player).replace("the [object]", entity).replace("[predicate]", action)
+        else:
+            simpleaction = action + " the " + entity + "."
+            longaction = template.replace("[name]", player).replace("[object]", entity).replace("[predicate]", action)
         return simpleaction, longaction
 
 actiontemplates = {
