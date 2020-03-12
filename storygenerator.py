@@ -376,9 +376,7 @@ class StoryGenerator():
         all_actions = []
 
         for person in self.people_in_paragraph:
-            print(self.bert)
-            print(person)
-            predicate, probability = self.bert.getBestPredicateAndProbability("He", person)
+            predicate, probability = self.bert.getBestPredicateAndProbability("He", person, True)
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, person, "PERSON")
             if self.PRIORIZE_DIALOG:
                 probability = -sys.float_info.max
@@ -406,27 +404,27 @@ class StoryGenerator():
             print(all_actions[-1])
 
         for place in self.places_in_paragraph:
-            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + place + ".")
+            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + place + ".", True)
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, place, "PLACE")
             all_actions.append({"type":"place", "action":predicate, "entity":place, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for event in self.events_in_paragraph:
-            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + event + ".")
+            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + event + ".", True)
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, event, "EVENT")
             all_actions.append({"type":"event", "action":predicate, "entity":event, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         for item in self.items_in_paragraph:
-            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + item + ".")
+            predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + item + ".", True)
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, item, "ITEM")
             all_actions.append({"type":"item", "action":predicate, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
         if (self.USE_NOUNS):
             for noun in self.nouns_in_paragraph:
-                predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + noun + ".")
+                predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + noun + ".", True)
                 simple_action, action_sentence = self.getUniversalActionTemplates(predicate, noun, "NOUN")
                 all_actions.append({"type":"noun", "action":predicate, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability})
 
-        print("Found " + str(len(all_actions)) + " actions.")
+        print("Identified " + str(len(all_actions)) + " plausible actions.")
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
 
         if (self.MAX_ACTIONS > -1):

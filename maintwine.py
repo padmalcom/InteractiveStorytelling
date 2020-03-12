@@ -30,7 +30,7 @@ class TwineGenerator():
         self.storyGenerator.reset()
         
     def getInventoryCode(self):
-        return ["::MacroPassage[script]"
+        return ["::MacroPassage[script]",
             "window.getInv = function() {return state.active.variables.inventory;}",
             "macros.initInv = {handler: function(place, macroName, params, parser) {state.active.variables.inventory = [];}};",
             "macros.addToInv = {handler: function(place, macroName, params, parser) {if (params.length == 0) {throwError(place, \"<<\" + macroName + \">>: no parameters given\");return;}    if (state.active.variables.inventory.indexOf(params[0]) == -1) {state.active.variables.inventory.push(params[0]);}}};",
@@ -59,6 +59,11 @@ class TwineGenerator():
         self.storyGenerator.party2 = input("Type the name of another member: ")
         self.storyGenerator.paragraphs = int(input("Enter a number of paragraphs: "))
         self.storyGenerator.MAX_ACTIONS = int(input("Enter the number of actions in a paragraph: "))
+        self.addContinueButton = int(input("Offer a continue button (1 yes, 0 no): "))
+
+        if (self.addContinueButton != 0 and self.addContinueButton != 1):
+            self.addContinueButton = 0
+            print("Continue button was disabled due to an invalid input.")
 
         self.storyGenerator.setting_id = random.randrange(0, len(self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions))
         self.storyGenerator.setting_id = 0 # temporary
@@ -115,8 +120,10 @@ class TwineGenerator():
         
         self.current_node = 0
         # (N^L-1) / (N-1)
-        self.total_nodes = (self.storyGenerator.MAX_ACTIONS ** self.storyGenerator.paragraphs-1) / ((self.storyGenerator.MAX_ACTIONS-1) + 0.00000001)
-        #self.total_nodes = 2 * (self.storyGenerator.MAX_ACTIONS ** (self.storyGenerator.paragraphs-1)) - 1
+        if self.storyGenerator.MAX_ACTIONS + self.addContinueButton == 1:
+            self.total_nodes = self.storyGenerator.paragraphs
+        else:
+            self.total_nodes = ((self.storyGenerator.MAX_ACTIONS + self.addContinueButton) ** self.storyGenerator.paragraphs) / ((self.storyGenerator.MAX_ACTIONS-1 + self.addContinueButton))
         self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
 
         f.write("The end\n")
@@ -129,8 +136,6 @@ class TwineGenerator():
 
     def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences):
 
-        print("Depth " + str(depth) + " of " + str(self.storyGenerator.paragraphs))
-
         # generate twine paragraph id
         if twineid == "1":
             f.write("::Start\n")
@@ -140,7 +145,7 @@ class TwineGenerator():
             f.write("::" + str(twineid) + "\n")
 
         self.current_node += 1
-        print("Calculating node " + str(self.current_node) + "/" + str(self.total_nodes) + "...")
+        print("Calculating node " + str(self.current_node) + "/" + str(self.total_nodes) + " (depth: " + str(depth) + ") ...")
 
         # end reached?
         if (depth == self.storyGenerator.paragraphs):
@@ -225,7 +230,7 @@ class TwineGenerator():
 
         html_paragraph = paragraph
 
-        f.write(html_paragraph + "\n<img src=\"plt" + str(twineid) + ".png\"><br>")
+        f.write(html_paragraph + "\n<img style=\"width: 400px; height: auto;\" src=\"plt" + str(twineid) + ".png\"><br>")
 
         # Generate links
         if self.BERT_ACTIONS == True:
@@ -236,13 +241,18 @@ class TwineGenerator():
             f.write("[[" + action["simple"] + "->" + twineid + "_" + str(idx) +"]]\n")
 
         # simple continue button
-        f.write("[[continue->" + twineid + "_" + str(len(actions))+"]]\n\n")
+        if self.addContinueButton == 1 or len(actions) == 0:
+            f.write("[[continue->" + twineid + "_" + str(len(actions))+"]]\n\n")
         for idx, action in enumerate(actions):
             # generate target for each action
+            print("Generating action " + str(idx+1) + "/" + str(len(actions)) + "...")
             self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy())
 
         # generate continue paragraph
-        self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy())
+        if self.addContinueButton == 1 or len(actions) == 0:
+            if len(actions) == 0 and self.addContinueButton == 0:
+                print("No plausible action found; adding a continue button.")
+            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy())
 
 if __name__ == '__main__':
     tg = TwineGenerator()

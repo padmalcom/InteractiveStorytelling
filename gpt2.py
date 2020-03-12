@@ -120,7 +120,6 @@ class GPT2:
         for i in range(num_samples):
             text = self.tokenizer.decode(outputs[i], skip_special_tokens=True)
             result.append(text)
-            print(text)
         return result
 
     def generate_text(self, prefix, length):
