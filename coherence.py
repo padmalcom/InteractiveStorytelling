@@ -22,7 +22,7 @@ class Coherence:
         self.en_stop = get_stop_words('en')
         self.p_stemmer = PorterStemmer()
 
-    def calculateCoherence(self, paragraphs, nouns_only=True):
+    def calculateCoherence(self, paragraphs, nouns_only=True, stem_tokens=False):
         texts = []
         is_noun = lambda pos: pos[:2] == 'NN'
         for i in paragraphs:
@@ -35,14 +35,15 @@ class Coherence:
             stopped_tokens = [i for i in tokens if not i in self.en_stop]
 
             # nouns only
-            if (nouns_only):
+            if nouns_only:
                 stopped_tokens = [word for (word, pos) in pos_tag(stopped_tokens) if is_noun(pos)]
 
             # stem tokens
-            stemmed_tokens = [self.p_stemmer.stem(i) for i in stopped_tokens]
+            if stem_tokens:
+                stopped_tokens = [self.p_stemmer.stem(i) for i in stopped_tokens]
             
             # add tokens to list
-            texts.append(stemmed_tokens)
+            texts.append(stopped_tokens)
         dictionary = corpora.Dictionary(texts)
         corpus = [dictionary.doc2bow(text) for text in texts]
         ldamodel = gensim.models.ldamodel.LdaModel(corpus, num_topics=3, id2word = dictionary, passes=20)

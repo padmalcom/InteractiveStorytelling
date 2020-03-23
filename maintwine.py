@@ -131,7 +131,6 @@ class TwineGenerator():
         f.write("A " + self.storyGenerator.setting + " story\n")
         f.writelines(["\n", "::Configuration [twee2]\n","Twee2::build_config.story_ifid = '7870917a-11c5-4bb8-a945-c810834c8229'\n","Twee2::build_config.story_format = 'SugarCube2'\n", "\n"])
 
-
         # Write start
         self.storyGenerator.extractEntities(paragraph)
         html_paragraph = paragraph
@@ -161,6 +160,9 @@ class TwineGenerator():
             f.write("::Start\n")
             f.write("<<initInv>>")
             f.write(html)
+
+            if len(paragraph_topics) > 0:
+                f.write("<b>Topics:<b> " + ",".join(paragraph_topics[len(paragraph_topics)-1]))
         else:
             f.write("::" + str(twineid) + "\n")
 
@@ -218,6 +220,9 @@ class TwineGenerator():
             # finally append entire text
             text = text + " " + paragraph
             html = html + " " + html_paragraph
+            
+            if len(paragraph_topics) > 0:
+                f.write("<b>Topics:<b> " + ",".join(paragraph_topics[len(paragraph_topics)-1]))
 
             f.write(html_paragraph + "\n<b>THE END</b>\n")
             return
@@ -278,6 +283,8 @@ class TwineGenerator():
         self.storyGenerator.extractEntities(paragraph)
 
         html_paragraph = paragraph
+        if len(paragraph_topics) > 0:
+            f.write("<b>Topics:<b> " + ",".join(paragraph_topics[len(paragraph_topics)-1]))
 
         f.write(html_paragraph + "\n<img style=\"width: 400px; height: auto;\" src=\"plt" + str(twineid) + ".png\"><br>")
 

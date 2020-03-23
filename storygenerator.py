@@ -353,7 +353,7 @@ class StoryGenerator():
                     else:
                         for synset in wn.synsets(token.text):
                             if ((synset.lexname() in self.acceptedNouns) and (not token.text in self.nouns_in_paragraph)):
-                                print("type: " + synset.lexname() + " value: " + token.text)
+                                #print("type: " + synset.lexname() + " value: " + token.text)
                                 self.nouns_in_paragraph.append(token.text)
 
     def highlightEntities(self, text):
