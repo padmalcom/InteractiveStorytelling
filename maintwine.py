@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 import sys
 from datetime import datetime
 import matplotlib.pyplot as plt
+from sentiment import Sentiment
 
 class TwineGenerator():
     def __init__(self):
@@ -23,6 +24,8 @@ class TwineGenerator():
         self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
 
         self.BERT_ACTIONS = True
+
+        self.sentiment = Sentiment()
 
         print("Initialization done.")
 
@@ -70,6 +73,8 @@ class TwineGenerator():
 
         all_paragraphs = []
         paragraph_coherences = []
+        paragraph_sentiments = []
+        paragraph_topics = []
 
         inventory = []
 
@@ -86,16 +91,31 @@ class TwineGenerator():
         paragraph = paragraph.replace("[name]", self.storyGenerator.name)
         all_paragraphs.append(paragraph)
         coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
-        paragraph_coherences.append(coh)
-        print("Coherence is: " + str(coh))
+        paragraph_coherences.append(coh[0])
+        paragraph_topics.append(coh[1][len(coh[1])-1])
+        print("Coherence is: " + str(coh[0]))
+        print("Topics are: " + str(coh[1][len(coh[1])-1]))
+
+        sentiment = self.sentiment.sentiment(paragraph)
+        paragraph_sentiments.append(sentiment)
+        print("Sentiment is: " + str(sentiment))
 
         # Plot coherence graph
         fig, ax = plt.subplots(nrows=1, ncols=1)
         ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
         ax.set_xlabel("Paragraph")
         ax.set_ylabel("Coherence")
-        fig.savefig(self.out_path + r"/plt" + str(len(paragraph_coherences)) + ".png")
+        fig.savefig(self.out_path + r"/coh_" + str(len(paragraph_coherences)) + ".png")
         plt.close(fig)
+
+        # Plot sentiment graph
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
+        ax.set_xlabel("Paragraph")
+        ax.set_ylabel("Sentiment")
+        fig.savefig(self.out_path + r"/sent_" + str(len(paragraph_sentiments)) + ".png")
+        plt.close(fig)
+
 
         # Open file to write
         absolute_path = self.out_path + r"/story.tw2"
@@ -124,7 +144,7 @@ class TwineGenerator():
             self.total_nodes = self.storyGenerator.paragraphs
         else:
             self.total_nodes = ((self.storyGenerator.MAX_ACTIONS + self.addContinueButton) ** self.storyGenerator.paragraphs) / ((self.storyGenerator.MAX_ACTIONS-1 + self.addContinueButton))
-        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences)
+        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences, paragraph_sentiments, paragraph_topics)
 
         f.write("The end\n")
         f.close()
@@ -134,7 +154,7 @@ class TwineGenerator():
         os.rename(self.out_path, self.out_path + "_done_in_" + str(second_diff))
 
 
-    def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences):
+    def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences, paragraph_sentiments, paragraph_topics):
 
         # generate twine paragraph id
         if twineid == "1":
@@ -162,8 +182,23 @@ class TwineGenerator():
             # coherence
             all_paragraphs.append(new_text)
             coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
-            paragraph_coherences.append(coh)
-            print("Coherence is: " + str(coh))
+            paragraph_coherences.append(coh[0])
+            paragraph_topics.append(coh[1][len(coh[1])-1])
+            print("Coherence is: " + str(coh[0]))
+            print("Topics are: " + str(coh[1][len(coh[1])-1]))
+
+            sentiment = self.sentiment.sentiment(paragraph)
+            paragraph_sentiments.append(sentiment)
+            print("Sentiment is: " + str(sentiment))
+
+
+            # Plot sentiment graph
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
+            ax.set_xlabel("Paragraph")
+            ax.set_ylabel("Sentiment")
+            fig.savefig(self.out_path + r"/sent_" + str(twineid) + ".png")
+            plt.close(fig)
 
             # Plot coherence graph
             fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -213,8 +248,22 @@ class TwineGenerator():
 
         all_paragraphs.append(new_text)
         coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
-        paragraph_coherences.append(coh)
-        print("Coherence is: " + str(coh))
+        paragraph_coherences.append(coh[0])
+        paragraph_topics.append(coh[1][len(coh[1])-1])
+        print("Coherence is: " + str(coh[0]))
+        print("Topics are: " + str(coh[1][len(coh[1])-1]))
+
+        sentiment = self.sentiment.sentiment(paragraph)
+        paragraph_sentiments.append(sentiment)
+        print("Sentiment is: " + str(sentiment))
+
+        # Plot sentiment graph
+        fig, ax = plt.subplots(nrows=1, ncols=1)
+        ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
+        ax.set_xlabel("Paragraph")
+        ax.set_ylabel("Sentiment")
+        fig.savefig(self.out_path + r"/sent_" + str(twineid) + ".png")
+        plt.close(fig)
 
         # Plot coherence graph
         fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -246,13 +295,13 @@ class TwineGenerator():
         for idx, action in enumerate(actions):
             # generate target for each action
             print("Generating action " + str(idx+1) + "/" + str(len(actions)) + "...")
-            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy())
+            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(), paragraph_topics.copy())
 
         # generate continue paragraph
         if self.addContinueButton == 1 or len(actions) == 0:
             if len(actions) == 0 and self.addContinueButton == 0:
                 print("No plausible action found; adding a continue button.")
-            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy())
+            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(), paragraph_topics.copy())
 
 if __name__ == '__main__':
     tg = TwineGenerator()

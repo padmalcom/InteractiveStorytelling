@@ -2,16 +2,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from transformers import pipeline
 import nltk
-from nltk.stem import WordNetLemmatizer 
+from nltk.stem import WordNetLemmatizer
+import random
 
 class Bert:
     def __init__(self):
         self.nlp = pipeline('fill-mask')
         self.lemmatizer = WordNetLemmatizer() 
     
-    def getBestPredicateAndProbability(self, subj, obj, lemmatize=True, random=True):
+    def getBestPredicateAndProbability(self, subj, obj, lemmatize=True, random_choice=True):
         res = self.nlp(subj + " <mask> " + obj + ".")
         for r in res:
+            #print(r)
             sentence = r['sequence'].replace("<s>", "").replace("</s>", "")
             words = nltk.word_tokenize(sentence)
             results = []
@@ -19,20 +21,17 @@ class Bert:
                 if words[i] == subj and i<len(words):
                     verb = words[i+1]
                     if lemmatize == True:
-                        print("Lemmatizing " + verb + "...")
+                        #print("Lemmatizing " + verb + "...")
                         verb = self.lemmatizer.lemmatize(verb, pos='v')
-                        print("to " + verb)
-                    if not random:
+                        #print("to " + verb)
+                    if not random_choice:
                         return verb, r['score']
                     else:
-                        results.append(tuple(verb, verb, r['score']))
+                        results.append((verb, r['score']))
 
         if len(results) > 0:
-            if random:
-                choice = random.choice(results)
-                return choice[0], choice[1]
-            else:
-                return results[0][0], results[0][1]
+            choice = random.choice(results)
+            return choice[0], choice[1]
         else:
             return "", 0.0
 
