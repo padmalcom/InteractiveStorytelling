@@ -67,6 +67,8 @@ class StoryGenerator():
         self.gender = gender.Detector()
         self.coherence = Coherence()
         self.bert = Bert()
+        self.nlp2 = spacy.load("en_core_web_lg")
+        self.nlp2.add_pipe(self.nlp2.create_pipe('sentencizer'), first=True)
         
 
         # try:
@@ -222,14 +224,13 @@ class StoryGenerator():
     #        return 'negative'
 
     def splitSentences(self, textExtract, allowIncomplete=False):
-        nlp2 = spacy.load("en_core_web_lg")
-        nlp2.add_pipe(nlp2.create_pipe('sentencizer'), first=True)
-        doc = nlp2(textExtract)
+
+        doc = self.nlp2(textExtract)
         sentences = [sent.string.strip() for sent in doc.sents]
         # Check completion
         result = []
         for sentence in sentences:
-            doc = nlp2(sentence)
+            doc = self.nlp2(sentence)
             if (len(doc)<=0):
                 continue
             if doc[len(doc)-1].is_punct or allowIncomplete:
@@ -306,7 +307,7 @@ class StoryGenerator():
         self.text = self.text + ending_text
         temp_html = self.html + "<span style=\"background-color: #FFFF00\">" + html_ending + "</span>"        
         self.html = self.html + html_ending
-        return temp_html
+        return ending_text, temp_html
 
     def extractEntities(self, text):
         # 4. NLP on paragraph [Extract People, Places, Items]
@@ -378,51 +379,64 @@ class StoryGenerator():
         for person in self.people_in_paragraph:
             predicate, probability = self.bert.getBestPredicateAndProbability("He", person, True)
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, person, "PERSON")
+            order = predicate + " " + person
             if self.PRIORIZE_DIALOG:
                 probability = -sys.float_info.max
-            all_actions.append({"type":"person", "action":predicate, "entity":person, "sentence":action_sentence, "simple": simple_action, "probability":probability})                
+            all_actions.append({"type":"person", "action":predicate, "entity":person, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order": order})  
 
         for _, combination in combinations.items():
             contains_all_items = all(elem in self.inventory for elem in [i.name for i in combination.items])
             if (contains_all_items):
-
                 targetItem, probability = self.bert.combineTo(combination.items[0], combination.items[1])
+                order = "combine " + " and ".join(combination.items)
                 action_sentence = self.name + " combined the " + combination.items[0] + " and the " + combination.items[1] + " to a " + targetItem
                 simple_action = "combine " + combination.items[0] + " and " + combination.items[1]
                 if self.PRIORIZE_COMBINATIONS:
                     probability = -sys.float_info.max
-                all_actions.append({"type":"combination", "action":"combine", "entity":targetItem, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"combination", "action":"combine", "entity":targetItem, "sentence":action_sentence,
+                    "simple": simple_action, "probability":probability, "order": order})
 
         for item in self.inventory:
             #predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + item + " from the inventory.")
-            print("item in inv: " + item)
+            #print("item in inv: " + item)
             simple_action = "use " + item + " from inventory."
+            order = "use " + item + " from inventory"
             action_sentence = self.name + " used the " + item + " from the inventory."
             if self.PRIORIZE_ITEM_USAGE:
                 probability = -sys.float_info.max            
-            all_actions.append({"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order": order})
             print(all_actions[-1])
 
         for place in self.places_in_paragraph:
             predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + place + ".", True)
+            order = predicate + " " + place
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, place, "PLACE")
-            all_actions.append({"type":"place", "action":predicate, "entity":place, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"place", "action":predicate, "entity":place, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order": order})
 
         for event in self.events_in_paragraph:
             predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + event + ".", True)
+            order = predicate + " " + event
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, event, "EVENT")
-            all_actions.append({"type":"event", "action":predicate, "entity":event, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"event", "action":predicate, "entity":event, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order": order})
 
         for item in self.items_in_paragraph:
             predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + item + ".", True)
+            order = predicate + " " + item
             simple_action, action_sentence = self.getUniversalActionTemplates(predicate, item, "ITEM")
-            all_actions.append({"type":"item", "action":predicate, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"item", "action":predicate, "entity":item, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order": order})
 
         if (self.USE_NOUNS):
             for noun in self.nouns_in_paragraph:
                 predicate, probability = self.bert.getBestPredicateAndProbability("He", "the " + noun + ".", True)
+                order = predicate + " " + noun
                 simple_action, action_sentence = self.getUniversalActionTemplates(predicate, noun, "NOUN")
-                all_actions.append({"type":"noun", "action":predicate, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"noun", "action":predicate, "entity":noun, "sentence":action_sentence,
+                    "simple": simple_action, "probability":probability, "order": order})
 
         print("Identified " + str(len(all_actions)) + " plausible actions.")
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
@@ -430,73 +444,99 @@ class StoryGenerator():
         if (self.MAX_ACTIONS > -1):
             sorted_actions = sorted_actions[:self.MAX_ACTIONS]
 
-        return sorted_actions       
+        return sorted_actions   
+
+    def generateActionsGPT2(self, paragraph, count):
+        all_actions = []
+        while len(all_actions) < count:
+            text = self.generateText(paragraph)
+            sentences = self.splitSentences(text, False)
+            if len(sentences) > 0:
+                all_actions.append({"type":"", "action":"", "entity":"", "sentence":sentences[0],
+                    "simple": sentences[0], "probability":1.0, "order": sentences[0]})               
+        return all_actions
 
     def generateActions(self):
         all_actions = []
 
         for person in self.people_in_paragraph:
             simple_action, action_sentence = self.getActionTemplates("talk to", person, "PERSON")
+            order = "talk to " + person
             probability = self.getProbability(simple_action)
             if self.PRIORIZE_DIALOG:
                 probability = -sys.float_info.max
-            all_actions.append({"type":"person", "action":"talk to", "entity":person, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"person", "action":"talk to", "entity":person, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order":order})
 
         for _, combination in combinations.items():
             contains_all_items = all(elem in self.inventory for elem in [i.name for i in combination.items])
-            if (contains_all_items):                 
+            if (contains_all_items):
+                order = "combine" + " and ".join(combination.items)
                 action_sentence = combination.action
                 action_sentence = action_sentence.replace("[name]", self.name)
                 simple_action = combination.simple_action
                 probability = self.getProbability(action_sentence)
                 if self.PRIORIZE_COMBINATIONS:
                     probability = -sys.float_info.max
-                all_actions.append({"type":"combination", "action":"combine", "entity":combination.returnItem.name, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"combination", "action":"combine", "entity":combination.returnItem.name,
+                    "sentence":action_sentence, "simple": simple_action, "probability":probability, "order":order})
 
         for person in self.people_in_paragraph:
             actions = ["compliment", "insult", "look at", "who are you,"]
             for action in actions:
+                order = action + " " + person
                 simple_action, action_sentence = self.getActionTemplates(action, person, "PERSON")
                 probability = self.getProbability(simple_action)
-                all_actions.append({"type":"person", "action":action, "entity":person, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"person", "action":action, "entity":person, "sentence":action_sentence,
+                    "simple": simple_action, "probability":probability, "order": order})
 
         for item in self.inventory:
             print("item in inv: " + item)
             simple_action, action_sentence = self.getActionTemplates("use", item, "ITEM")
+            order = "use " + item
             probability = self.getProbability(simple_action)
             if self.PRIORIZE_ITEM_USAGE:
                 probability = -sys.float_info.max            
-            all_actions.append({"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+            all_actions.append({"type":"item_from_inventory", "action":"use", "entity":item, "sentence":action_sentence,
+            "simple": simple_action, "probability":probability, "order": order})
             print(all_actions[-1])
 
         for place in self.places_in_paragraph:
             actions = ["go to", "look at"]
-            for action in actions:                  
+            for action in actions:
+                order = action + " " + place               
                 simple_action, action_sentence = self.getActionTemplates(action, place, "PLACE")
                 probability = self.getProbability(simple_action)
-                all_actions.append({"type":"place", "action":action, "entity":place, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"place", "action":action, "entity":place, "sentence":action_sentence,
+                    "simple": simple_action, "probability":probability, "order": order})
 
         for event in self.events_in_paragraph:
             actions = ["think about"]
             for action in actions:
+                order = action + " " + event
                 simple_action, action_sentence = self.getActionTemplates(action, event, "EVENT")
                 probability = self.getProbability(simple_action)
-                all_actions.append({"type":"event", "action":action, "entity":event, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"event", "action":action, "entity":event, "sentence":action_sentence,
+                "simple": simple_action, "probability":probability, "order": order})
 
         for item in self.items_in_paragraph:
             actions = ["take", "use", "push"]
             for action in actions:
+                order = action + " " + item
                 simple_action, action_sentence = self.getActionTemplates(action, item, "ITEM")
                 probability = self.getProbability(simple_action)
-                all_actions.append({"type":"item", "action":action, "entity":item, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                all_actions.append({"type":"item", "action":action, "entity":item, "sentence":action_sentence,
+                    "simple": simple_action, "probability":probability, "order": order})
 
         if (self.USE_NOUNS):
             for noun in self.nouns_in_paragraph:
                 actions = ["take", "use", "push", "pull", "open", "close", "look at", "talk to"]
                 for action in actions:
+                    order = action + " " + noun
                     simple_action, action_sentence = self.getActionTemplates(action, noun, "NOUN")
                     probability = self.getProbability(simple_action)
-                    all_actions.append({"type":"noun", "action":action, "entity":noun, "sentence":action_sentence, "simple": simple_action, "probability":probability})
+                    all_actions.append({"type":"noun", "action":action, "entity":noun, "sentence":action_sentence,
+                    "simple": simple_action, "probability":probability, "order": order})
 
         print("Found " + str(len(all_actions)) + " actions.")
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))

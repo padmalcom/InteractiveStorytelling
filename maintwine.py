@@ -9,6 +9,9 @@ import sys
 from datetime import datetime
 import matplotlib.pyplot as plt
 from sentiment import Sentiment
+import logging
+import logging.config
+
 
 class TwineGenerator():
     def __init__(self):
@@ -23,11 +26,15 @@ class TwineGenerator():
 
         self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
 
-        self.BERT_ACTIONS = True
+        self.action_generator = "NLP"
+
+        self.DEBUG_OUT = False
 
         self.sentiment = Sentiment()
-
-        print("Initialization done.")
+        logging.basicConfig(level=logging.DEBUG)
+        logging.config.dictConfig({'version': 1, 'disable_existing_loggers': True})
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Initialization done.")
 
     def reset(self):
         self.storyGenerator.reset()
@@ -64,9 +71,14 @@ class TwineGenerator():
         self.storyGenerator.MAX_ACTIONS = int(input("Enter the number of actions in a paragraph: "))
         self.addContinueButton = int(input("Offer a continue button (1 yes, 0 no): "))
 
+        self.action_generator = input("Select an action generator (NLP, MASK, GENERATIVE): ")
+        if not self.action_generator == "NLP" and not self.action_generator == "MASK" and not self.action_generator == "GENERATIVE":
+            print("Invalid action generator. Setting to NLP.")
+            self.action_generator = "NLP"
+
         if (self.addContinueButton != 0 and self.addContinueButton != 1):
             self.addContinueButton = 0
-            print("Continue button was disabled due to an invalid input.")
+            self.logger.debug("Continue button was disabled due to an invalid input.")
 
         self.storyGenerator.setting_id = random.randrange(0, len(self.storyGenerator.getSettings()[self.storyGenerator.setting].introductions))
         self.storyGenerator.setting_id = 0 # temporary
@@ -81,7 +93,7 @@ class TwineGenerator():
         # Where is the story stored?
         self.out_path = r"C:/Users/admin/" + datetime.now().strftime("story_%d.%m.%Y_%H-%M-%S")+ "_para" + str(self.storyGenerator.paragraphs)
         if os.path.exists(self.out_path):
-            print("Story directory already exists. Exiting")
+            self.logger.error("Story directory already exists. Exiting")
         else:
             os.mkdir(self.out_path)
         
@@ -93,28 +105,29 @@ class TwineGenerator():
         coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
         paragraph_coherences.append(coh[0])
         paragraph_topics.append(coh[1][len(coh[1])-1])
-        print("Coherence is: " + str(coh[0]))
-        print("Topics are: " + str(coh[1][len(coh[1])-1]))
+        self.logger.debug("Coherence is: " + str(coh[0]))
+        self.logger.debug("Topics are: " + str(coh[1][len(coh[1])-1]))
 
         sentiment = self.sentiment.sentiment(paragraph)
         paragraph_sentiments.append(sentiment)
-        print("Sentiment is: " + str(sentiment))
+        self.logger.debug("Sentiment is: " + str(sentiment))
 
         # Plot coherence graph
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
-        ax.set_xlabel("Paragraph")
-        ax.set_ylabel("Coherence")
-        fig.savefig(self.out_path + r"/coh_" + str(len(paragraph_coherences)) + ".png")
-        plt.close(fig)
+        if self.DEBUG_OUT:
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
+            ax.set_xlabel("Paragraph")
+            ax.set_ylabel("Coherence")
+            fig.savefig(self.out_path + r"/coh_" + str(len(paragraph_coherences)) + ".png")
+            plt.close(fig)
 
-        # Plot sentiment graph
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
-        ax.set_xlabel("Paragraph")
-        ax.set_ylabel("Sentiment")
-        fig.savefig(self.out_path + r"/sent_" + str(len(paragraph_sentiments)) + ".png")
-        plt.close(fig)
+            # Plot sentiment graph
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
+            ax.set_xlabel("Paragraph")
+            ax.set_ylabel("Sentiment")
+            fig.savefig(self.out_path + r"/sent_" + str(len(paragraph_sentiments)) + ".png")
+            plt.close(fig)
 
 
         # Open file to write
@@ -145,11 +158,10 @@ class TwineGenerator():
             self.total_nodes = ((self.storyGenerator.MAX_ACTIONS + self.addContinueButton) ** self.storyGenerator.paragraphs) / ((self.storyGenerator.MAX_ACTIONS-1 + self.addContinueButton))
         self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences, paragraph_sentiments, paragraph_topics)
 
-        f.write("The end\n")
         f.close()
         end_time = datetime.now()
         second_diff = (end_time - start_time).total_seconds()
-        print("Started at " + str(start_time) + ", ended at " + str(end_time) + ", duration in seconds: " + str(second_diff))
+        self.logger.info("Started at " + str(start_time) + ", ended at " + str(end_time) + ", duration in seconds: " + str(second_diff))
         os.rename(self.out_path, self.out_path + "_done_in_" + str(second_diff))
 
 
@@ -160,55 +172,53 @@ class TwineGenerator():
             f.write("::Start\n")
             f.write("<<initInv>>")
             f.write(html)
-
-            if len(paragraph_topics) > 0:
-                f.write("<b>Topics:<b> " + ",".join(paragraph_topics[len(paragraph_topics)-1]))
         else:
             f.write("::" + str(twineid) + "\n")
 
         self.current_node += 1
-        print("Calculating node " + str(self.current_node) + "/" + str(self.total_nodes) + " (depth: " + str(depth) + ") ...")
+        self.logger.info("Calculating node " + str(self.current_node) + "/" + str(self.total_nodes) + " (depth: " + str(depth) + ") ...")
 
         # end reached?
         if (depth == self.storyGenerator.paragraphs):
-            end = self.storyGenerator.generateEnd()
-            text = text + " " + action["sentence"] + " " + end
+            end_text, _ = self.storyGenerator.generateEnd()
+            text = text + " " + action["sentence"] + " " + end_text
             truncated_text = self.storyGenerator.truncateLastSentences(text, self.storyGenerator.TRUCATED_LAST_TEXT)
             try:
                 new_text = self.storyGenerator.generateText(truncated_text)
             except:
-                print("0 Generation error on truncated_text: '" + truncated_text + "'")
+                self.logger.error("0 Generation error on truncated_text: '" + truncated_text + "'")
                 new_text = ""
-            paragraph = action["sentence"] + " " + end + " " + new_text
+            paragraph = action["sentence"] + " " + end_text + " " + new_text
             
             # coherence
             all_paragraphs.append(new_text)
             coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
             paragraph_coherences.append(coh[0])
             paragraph_topics.append(coh[1][len(coh[1])-1])
-            print("Coherence is: " + str(coh[0]))
-            print("Topics are: " + str(coh[1][len(coh[1])-1]))
+            self.logger.debug("Coherence is: " + str(coh[0]))
+            self.logger.debug("Topics are: " + str(coh[1][len(coh[1])-1]))
 
             sentiment = self.sentiment.sentiment(paragraph)
             paragraph_sentiments.append(sentiment)
-            print("Sentiment is: " + str(sentiment))
+            self.logger.debug("Sentiment is: " + str(sentiment))
 
 
             # Plot sentiment graph
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
-            ax.set_xlabel("Paragraph")
-            ax.set_ylabel("Sentiment")
-            fig.savefig(self.out_path + r"/sent_" + str(twineid) + ".png")
-            plt.close(fig)
+            if self.DEBUG_OUT:
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
+                ax.set_xlabel("Paragraph")
+                ax.set_ylabel("Sentiment")
+                fig.savefig(self.out_path + r"/sent_" + str(twineid) + ".png")
+                plt.close(fig)
 
-            # Plot coherence graph
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
-            ax.set_xlabel("Paragraph")
-            ax.set_ylabel("Coherence")
-            fig.savefig(self.out_path + r"/plt" + str(twineid) + ".png")
-            plt.close(fig)
+                # Plot coherence graph
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
+                ax.set_xlabel("Paragraph")
+                ax.set_ylabel("Coherence")
+                fig.savefig(self.out_path + r"/coh_" + str(twineid) + ".png")
+                plt.close(fig)
 
             self.storyGenerator.extractEntities(paragraph)
             html_paragraph = paragraph
@@ -221,10 +231,18 @@ class TwineGenerator():
             text = text + " " + paragraph
             html = html + " " + html_paragraph
             
-            if len(paragraph_topics) > 0:
-                f.write("<b>Topics:<b> " + ",".join(paragraph_topics[len(paragraph_topics)-1]))
 
-            f.write(html_paragraph + "\n<b>THE END</b>\n")
+            f.write(html_paragraph + "<br>")
+
+            if len(paragraph_topics) > 0 and self.DEBUG_OUT:
+                f.write("<table bordercolor=\"white\" style=\"width: 100%\"><tr><td><b>Topics:</b></td><td>" + ",".join(paragraph_topics[len(paragraph_topics)-1]) + "</td></tr></table><br>")
+
+            if self.DEBUG_OUT:
+                f.write("<img style=\"width: 400px; height: auto;\" src=\"coh_" + str(twineid) + ".png\">" +
+                    "<img style=\"width: 400px; height: auto;\" src=\"sent_" + str(twineid) + ".png\">" +
+                    "<br>")      
+
+            f.write("<b>THE END</b>")
             return
   
         # process given action
@@ -236,7 +254,7 @@ class TwineGenerator():
                 inventory.remove(action["entity"])
                 f.write("<<removeFromInv \""+action["entity"]+"\">>")
             else:
-                print("Trying to remove " + action["entity"] + " but not in inv.")
+                logging.debug("Trying to remove " + action["entity"] + " but not in inv.")
 
         # generate next paragraph
         #self.storyGenerator.text = text
@@ -245,69 +263,81 @@ class TwineGenerator():
         try:
             new_text = self.storyGenerator.generateText(truncated_text)
         except:
-            print("1 Generation error on truncated_text: '" + truncated_text + "'")
+            logging.error("1 Generation error on truncated_text: '" + truncated_text + "'")
             new_text = ""
 
         #paragraph = action["sentence"] + " " + new_text
         paragraph = action["sentence"] + " " +new_text
-
+        
         all_paragraphs.append(new_text)
         coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
         paragraph_coherences.append(coh[0])
         paragraph_topics.append(coh[1][len(coh[1])-1])
-        print("Coherence is: " + str(coh[0]))
-        print("Topics are: " + str(coh[1][len(coh[1])-1]))
+        self.logger.debug("Coherence is: " + str(coh[0]))
+        self.logger.debug("Topics are: " + str(coh[1][len(coh[1])-1]))
 
         sentiment = self.sentiment.sentiment(paragraph)
         paragraph_sentiments.append(sentiment)
-        print("Sentiment is: " + str(sentiment))
+        self.logger.debug("Sentiment is: " + str(sentiment))
 
         # Plot sentiment graph
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
-        ax.set_xlabel("Paragraph")
-        ax.set_ylabel("Sentiment")
-        fig.savefig(self.out_path + r"/sent_" + str(twineid) + ".png")
-        plt.close(fig)
+        if self.DEBUG_OUT:
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(paragraph_sentiments)), paragraph_sentiments)
+            ax.set_xlabel("Paragraph")
+            ax.set_ylabel("Sentiment")
+            fig.savefig(self.out_path + r"/sent_" + str(twineid) + ".png")
+            plt.close(fig)
 
-        # Plot coherence graph
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
-        ax.set_xlabel("Paragraph")
-        ax.set_ylabel("Coherence")
-        image_path = self.out_path + r"/plt" + str(twineid) + ".png"
-        fig.savefig(image_path)
-        plt.close(fig)  
+            # Plot coherence graph
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(range(0,len(paragraph_coherences)), paragraph_coherences)
+            ax.set_xlabel("Paragraph")
+            ax.set_ylabel("Coherence")
+            image_path = self.out_path + r"/coh_" + str(twineid) + ".png"
+            fig.savefig(image_path)
+            plt.close(fig)  
 
         # extract entities
         self.storyGenerator.extractEntities(paragraph)
 
         html_paragraph = paragraph
-        if len(paragraph_topics) > 0:
-            f.write("<b>Topics:<b> " + ",".join(paragraph_topics[len(paragraph_topics)-1]))
+        html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
+        html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
 
-        f.write(html_paragraph + "\n<img style=\"width: 400px; height: auto;\" src=\"plt" + str(twineid) + ".png\"><br>")
+        f.write(html_paragraph + "<br>")
+        
+        if len(paragraph_topics) > 0 and self.DEBUG_OUT:
+            f.write("<table bordercolor=\"white\" style=\"width: 100%\"><tr><td><b>Topics:</b></td><td>" + ", ".join(paragraph_topics[len(paragraph_topics)-1]) + "</td></tr></table><br>")
+        
+        if self.DEBUG_OUT:
+            f.write("<img style=\"width: 400px; height: auto;\" src=\"coh_" + str(twineid) + ".png\">" +
+                "<img style=\"width: 400px; height: auto;\" src=\"sent_" + str(twineid) + ".png\">" +
+                "<br>")
 
         # Generate links
-        if self.BERT_ACTIONS == True:
+        if self.action_generator == "MASK":
             actions = self.storyGenerator.generateActionsBert()
+        elif self.action_generator == "GENERATIVE":
+            actions = self.storyGenerator.generateActionsGPT2(paragraph, self.storyGenerator.MAX_ACTIONS)
         else:
             actions = self.storyGenerator.generateActions()
+
         for idx, action in enumerate(actions):
-            f.write("[[" + action["simple"] + "->" + twineid + "_" + str(idx) +"]]\n")
+            f.write("[[" + action["order"] + "->" + twineid + "_" + str(idx) +"]]\n")
 
         # simple continue button
         if self.addContinueButton == 1 or len(actions) == 0:
             f.write("[[continue->" + twineid + "_" + str(len(actions))+"]]\n\n")
         for idx, action in enumerate(actions):
             # generate target for each action
-            print("Generating action " + str(idx+1) + "/" + str(len(actions)) + "...")
+            self.logger.debug("Generating action " + str(idx+1) + "/" + str(len(actions)) + "...")
             self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(), paragraph_topics.copy())
 
         # generate continue paragraph
         if self.addContinueButton == 1 or len(actions) == 0:
             if len(actions) == 0 and self.addContinueButton == 0:
-                print("No plausible action found; adding a continue button.")
+                self.logger.debug("No plausible action found; adding a continue button.")
             self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(), paragraph_topics.copy())
 
 if __name__ == '__main__':

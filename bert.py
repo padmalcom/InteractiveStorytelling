@@ -36,7 +36,8 @@ class Bert:
             return "", 0.0
 
     def combineTo(self, item1, item2):
-        res = self.nlp("He combined the " + item1 + " and the " + item2 + " to a <mask>.")
+        res = self.nlp("He combined " + item1 + " and " + item2 + " and received a <mask>.")
+        print(res)
         for r in res:
             sentence = r['sequence'].replace("<s>", "").replace("</s>", "")
             words = nltk.word_tokenize(sentence)
