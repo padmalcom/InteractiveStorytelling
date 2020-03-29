@@ -2,6 +2,7 @@ from collections import Counter, defaultdict
 import operator
 import random
 import sys
+import html
 
 # nlp
 import spacy
@@ -373,7 +374,7 @@ class StoryGenerator():
                 text = text.replace(noun, "<b><font color=\"blue\">" + noun + "</font></b>")
         return text
 
-    def generateActionsBert(self):
+    def generateActionsBert(self, paragraph_actions):
         all_actions = []
 
         for person in self.people_in_paragraph:
@@ -441,22 +442,49 @@ class StoryGenerator():
         print("Identified " + str(len(all_actions)) + " plausible actions.")
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
 
+        if len(sorted_actions) == 0:
+            return sorted_actions
+
+        # store best action in case that all actions have been done before
+        saved_action = sorted_actions[0]
+
+        sorted_actions = [x for x in sorted_actions if x["simple"] not in paragraph_actions]
+        if len(sorted_actions) == 0:
+            sorted_actions.append(saved_action)
+
         if (self.MAX_ACTIONS > -1):
             sorted_actions = sorted_actions[:self.MAX_ACTIONS]
 
-        return sorted_actions   
+        return sorted_actions 
 
-    def generateActionsGPT2(self, paragraph, count):
+    def generateActionsGPT2(self, paragraph, count, paragraph_actions):
         all_actions = []
         while len(all_actions) < count:
             text = self.generateText(paragraph)
             sentences = self.splitSentences(text, False)
             if len(sentences) > 0:
-                all_actions.append({"type":"", "action":"", "entity":"", "sentence":sentences[0],
-                    "simple": sentences[0], "probability":1.0, "order": sentences[0]})               
+                #s = html.escape(sentences[0])
+                s = sentences[0]
+
+                all_actions.append({"type":"", "action":"", "entity":"", "sentence":s,
+                    "simple": s, "probability":1.0, "order": s})
+
+        if len(all_actions) == 0:
+            return all_actions
+
+        # store best action in case that all actions have been done before
+        saved_action = all_actions[0]
+
+        all_actions = [x for x in all_actions if x["simple"] not in paragraph_actions]
+        if len(all_actions) == 0:
+            all_actions.append(saved_action)
+
+        if (self.MAX_ACTIONS > -1):
+            all_actions = all_actions[:self.MAX_ACTIONS]
+
         return all_actions
 
-    def generateActions(self):
+    def generateActions(self, paragraph_actions):
         all_actions = []
 
         for person in self.people_in_paragraph:
@@ -540,6 +568,16 @@ class StoryGenerator():
 
         print("Found " + str(len(all_actions)) + " actions.")
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
+
+        if len(sorted_actions) == 0:
+            return sorted_actions
+
+        # store best action in case that all actions have been done before
+        saved_action = sorted_actions[0]
+
+        sorted_actions = [x for x in sorted_actions if x["simple"] not in paragraph_actions]
+        if len(sorted_actions) == 0:
+            sorted_actions.append(saved_action)
 
         if (self.MAX_ACTIONS > -1):
             sorted_actions = sorted_actions[:self.MAX_ACTIONS]

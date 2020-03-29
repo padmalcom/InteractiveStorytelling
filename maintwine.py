@@ -8,6 +8,8 @@ from collections import Counter, defaultdict
 import sys
 from datetime import datetime
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from sentiment import Sentiment
 import logging
 import logging.config
@@ -26,9 +28,9 @@ class TwineGenerator():
 
         self.EMPTY_ACTION = {"type":"", "action":"", "entity":"", "sentence":"", "simple": "", "probability":""}
 
-        self.action_generator = "NLP"
+        self.action_generator = 0
 
-        self.DEBUG_OUT = False
+        self.DEBUG_OUT = True
 
         self.sentiment = Sentiment()
         logging.basicConfig(level=logging.DEBUG)
@@ -71,10 +73,10 @@ class TwineGenerator():
         self.storyGenerator.MAX_ACTIONS = int(input("Enter the number of actions in a paragraph: "))
         self.addContinueButton = int(input("Offer a continue button (1 yes, 0 no): "))
 
-        self.action_generator = input("Select an action generator (NLP, MASK, GENERATIVE): ")
-        if not self.action_generator == "NLP" and not self.action_generator == "MASK" and not self.action_generator == "GENERATIVE":
+        self.action_generator = int(input("Select an action generator (0 NLP, 1 MASK, 2 GENERATIVE): "))
+        if self.action_generator != 0 and self.action_generator != 1 and self.action_generator != 2:
             print("Invalid action generator. Setting to NLP.")
-            self.action_generator = "NLP"
+            self.action_generator = 0
 
         if (self.addContinueButton != 0 and self.addContinueButton != 1):
             self.addContinueButton = 0
@@ -87,6 +89,8 @@ class TwineGenerator():
         paragraph_coherences = []
         paragraph_sentiments = []
         paragraph_topics = []
+        paragraph_actions = []
+        paragraph_characters = []
 
         inventory = []
 
@@ -149,6 +153,7 @@ class TwineGenerator():
         html_paragraph = paragraph
         html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+        paragraph_characters.append(self.storyGenerator.people_in_paragraph.copy())
         
         self.current_node = 0
         # (N^L-1) / (N-1)
@@ -156,7 +161,8 @@ class TwineGenerator():
             self.total_nodes = self.storyGenerator.paragraphs
         else:
             self.total_nodes = ((self.storyGenerator.MAX_ACTIONS + self.addContinueButton) ** self.storyGenerator.paragraphs) / ((self.storyGenerator.MAX_ACTIONS-1 + self.addContinueButton))
-        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs, paragraph_coherences, paragraph_sentiments, paragraph_topics)
+        self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs,
+            paragraph_coherences, paragraph_sentiments, paragraph_topics, paragraph_actions, paragraph_characters)
 
         f.close()
         end_time = datetime.now()
@@ -165,7 +171,8 @@ class TwineGenerator():
         os.rename(self.out_path, self.out_path + "_done_in_" + str(second_diff))
 
 
-    def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences, paragraph_sentiments, paragraph_topics):
+    def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences,
+        paragraph_sentiments, paragraph_topics, paragraph_actions, paragraph_characters):
 
         # generate twine paragraph id
         if twineid == "1":
@@ -226,6 +233,60 @@ class TwineGenerator():
             # highlight entities and names
             html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
             html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+            paragraph_characters.append(self.storyGenerator.people_in_paragraph.copy())
+
+            if self.DEBUG_OUT:
+                # https://stackoverflow.com/questions/50821484/python-plotting-missing-data
+                distinct_characters = []
+                for chars in paragraph_characters:
+                    for char in chars:
+                        if not char in distinct_characters:
+                            distinct_characters.append(char)
+                print("Distinct chars: " + str(distinct_characters))
+
+                paragraph_list = range(len(paragraph_characters))
+                character_presences = []
+                for idx1, char in enumerate(distinct_characters):
+                        cp = []
+                        for idx, pc in enumerate(paragraph_characters):
+                            if char in pc:
+                                cp.append(idx1)
+                            else:
+                                cp.append(np.nan)
+                        character_presences.append(cp)
+                print("Character presences: " + str(character_presences))
+
+                character_dict = dict()
+                for idx, cp in enumerate(character_presences):
+                    character_dict[distinct_characters[idx]] = cp
+                df = pd.DataFrame(character_dict, index = paragraph_list)
+                df.index.name = 'paragraphs'
+                print("DF: " + str(df))
+
+                fig, ax = plt.subplots()
+                
+                for key in character_dict:
+                    print("Plotting " + str(key))
+                    line, = ax.plot(df[key].fillna(method='ffill'), ls = '--', lw = 1, label='_nolegend_')
+                    ax.plot(df[key], color=line.get_color(), lw=1.5, marker = 'o')
+                
+                plt.xticks(range(len(paragraph_characters)))
+                plt.yticks(range(len(distinct_characters)))               
+
+                plt.xlabel('paragraph')
+                plt.ylabel('character')
+
+                # replace labels
+                labels=ax.get_yticks().tolist()
+                print("Labels are: " + str(labels))
+                for idx, char in enumerate(distinct_characters):
+                    labels[idx] = char
+                print("Labels are now: " + str(labels))
+                ax.set_yticklabels(labels)
+
+                fig.savefig(self.out_path + r"/char_" + str(twineid) + ".png")
+                plt.close(fig)
+
 
             # finally append entire text
             text = text + " " + paragraph
@@ -235,14 +296,14 @@ class TwineGenerator():
             f.write(html_paragraph + "<br>")
 
             if len(paragraph_topics) > 0 and self.DEBUG_OUT:
-                f.write("<table bordercolor=\"white\" style=\"width: 100%\"><tr><td><b>Topics:</b></td><td>" + ",".join(paragraph_topics[len(paragraph_topics)-1]) + "</td></tr></table><br>")
+                f.write("<table bordercolor=\"white\" style=\"width: 100%\"><tr><td><b>Topics:</b></td><td>" + ", ".join(paragraph_topics[len(paragraph_topics)-1]) + "</td></tr></table><br>")
 
             if self.DEBUG_OUT:
                 f.write("<img style=\"width: 400px; height: auto;\" src=\"coh_" + str(twineid) + ".png\">" +
                     "<img style=\"width: 400px; height: auto;\" src=\"sent_" + str(twineid) + ".png\">" +
                     "<br>")      
 
-            f.write("<b>THE END</b>")
+            f.write("\n<b>THE END</b>\n")
             return
   
         # process given action
@@ -256,8 +317,11 @@ class TwineGenerator():
             else:
                 logging.debug("Trying to remove " + action["entity"] + " but not in inv.")
 
+        # Store the action in paragraph actions
+        if action["simple"] != "":
+            paragraph_actions.append(action["simple"])
+
         # generate next paragraph
-        #self.storyGenerator.text = text
         text = text + " " + action["sentence"]
         truncated_text = self.storyGenerator.truncateLastSentences(text, self.storyGenerator.TRUCATED_LAST_TEXT)
         try:
@@ -265,9 +329,8 @@ class TwineGenerator():
         except:
             logging.error("1 Generation error on truncated_text: '" + truncated_text + "'")
             new_text = ""
-
-        #paragraph = action["sentence"] + " " + new_text
-        paragraph = action["sentence"] + " " +new_text
+            
+        paragraph = action["sentence"] + " " + new_text
         
         all_paragraphs.append(new_text)
         coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
@@ -304,6 +367,59 @@ class TwineGenerator():
         html_paragraph = paragraph
         html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
+        paragraph_characters.append(self.storyGenerator.people_in_paragraph.copy())
+
+        if self.DEBUG_OUT:
+            # https://stackoverflow.com/questions/50821484/python-plotting-missing-data
+            distinct_characters = []
+            for chars in paragraph_characters:
+                for char in chars:
+                    if not char in distinct_characters:
+                        distinct_characters.append(char)
+            print("Distinct chars: " + str(distinct_characters))
+
+            paragraph_list = range(len(paragraph_characters))
+            character_presences = []
+            for idx1, char in enumerate(distinct_characters):
+                    cp = []
+                    for idx, pc in enumerate(paragraph_characters):
+                        if char in pc:
+                            cp.append(idx1)
+                        else:
+                            cp.append(np.nan)
+                    character_presences.append(cp)
+            print("Character presences: " + str(character_presences))
+
+            character_dict = dict()
+            for idx, cp in enumerate(character_presences):
+                character_dict[distinct_characters[idx]] = cp
+            df = pd.DataFrame(character_dict, index = paragraph_list)
+            df.index.name = 'paragraphs'
+            print("DF: " + str(df))
+
+            fig, ax = plt.subplots()
+            
+            for key in character_dict:
+                print("Plotting " + str(key))
+                line, = ax.plot(df[key].fillna(method='ffill'), ls = '--', lw = 1, label='_nolegend_')
+                ax.plot(df[key], color=line.get_color(), lw=1.5, marker = 'o')
+            
+            plt.xticks(range(len(paragraph_characters)))
+            plt.yticks(range(len(distinct_characters)))
+
+            plt.xlabel('paragraph')
+            plt.ylabel('character')
+
+            # replace labels
+            labels=ax.get_yticks().tolist()
+            print("Labels are: " + str(labels))
+            for idx, char in enumerate(distinct_characters):
+                labels[idx] = char
+            print("Labels are now: " + str(labels))
+            ax.set_yticklabels(labels)
+
+            fig.savefig(self.out_path + r"/char_" + str(twineid) + ".png")
+            plt.close(fig)
 
         f.write(html_paragraph + "<br>")
         
@@ -313,15 +429,16 @@ class TwineGenerator():
         if self.DEBUG_OUT:
             f.write("<img style=\"width: 400px; height: auto;\" src=\"coh_" + str(twineid) + ".png\">" +
                 "<img style=\"width: 400px; height: auto;\" src=\"sent_" + str(twineid) + ".png\">" +
+                "<img style=\"width: 400px; height: auto;\" src=\"char_" + str(twineid) + ".png\">" +
                 "<br>")
 
         # Generate links
-        if self.action_generator == "MASK":
-            actions = self.storyGenerator.generateActionsBert()
-        elif self.action_generator == "GENERATIVE":
-            actions = self.storyGenerator.generateActionsGPT2(paragraph, self.storyGenerator.MAX_ACTIONS)
+        if self.action_generator == 1:
+            actions = self.storyGenerator.generateActionsBert(paragraph_actions)
+        elif self.action_generator == 2:
+            actions = self.storyGenerator.generateActionsGPT2(paragraph, self.storyGenerator.MAX_ACTIONS, paragraph_actions)
         else:
-            actions = self.storyGenerator.generateActions()
+            actions = self.storyGenerator.generateActions(paragraph_actions)
 
         for idx, action in enumerate(actions):
             f.write("[[" + action["order"] + "->" + twineid + "_" + str(idx) +"]]\n")
@@ -332,13 +449,17 @@ class TwineGenerator():
         for idx, action in enumerate(actions):
             # generate target for each action
             self.logger.debug("Generating action " + str(idx+1) + "/" + str(len(actions)) + "...")
-            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx), depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(), paragraph_topics.copy())
+            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(idx),
+                depth+1, action, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(),
+                paragraph_topics.copy(), paragraph_actions.copy(), paragraph_characters.copy())
 
         # generate continue paragraph
         if self.addContinueButton == 1 or len(actions) == 0:
             if len(actions) == 0 and self.addContinueButton == 0:
                 self.logger.debug("No plausible action found; adding a continue button.")
-            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)), depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy(), paragraph_sentiments.copy(), paragraph_topics.copy())
+            self.recursivelyContinue(f, text + paragraph, html + html_paragraph, inventory, twineid + "_" + str(len(actions)),
+                depth+1, self.EMPTY_ACTION, all_paragraphs.copy(), paragraph_coherences.copy(),
+                paragraph_sentiments.copy(), paragraph_topics.copy(), paragraph_actions.copy(), paragraph_characters.copy())
 
 if __name__ == '__main__':
     tg = TwineGenerator()
