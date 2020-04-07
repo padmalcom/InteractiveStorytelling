@@ -32,6 +32,8 @@ df.index.name = 'paragraphs'
 print("DF: " + str(df))
 
 fig, ax = plt.subplots()
+fig.set_figheight(15)
+fig.set_figwidth(15)
 
 for key in character_dict:
     print("Plotting " + str(key))

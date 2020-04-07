@@ -101,8 +101,10 @@ class InteractiveStoryUI(object):
     def __init__(self):
         super().__init__()
         self.storyGenerator = StoryGenerator()
+        self.storyGenerator.MAX_ACTIONS = 1
         self.action_buttons = []
         self.inventory_labels = []
+        self.paragraph_actions = []
 
     def reset(self):
         self.storyGenerator.reset()
@@ -125,6 +127,8 @@ class InteractiveStoryUI(object):
         #else:
             # Select action template
         #    action_sentence = self.storyGenerator.getActionTemplates(action, entity)
+        if action["simple"] != "":
+            self.paragraph_actions.append(action["simple"])
 
         # add to inventory
         if action == "take": # and not entity in self.storyGenerator.inventory
@@ -162,12 +166,6 @@ class InteractiveStoryUI(object):
             self.storyGenerator.paragraph_coherences.append(coh)
             print("Coherence is: " + str(coh))
 
-            # Plot coherence graph
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.plot(range(0,len(self.storyGenerator.paragraph_coherences)), self.storyGenerator.paragraph_coherences)
-            fig.savefig("C:\\Users\\admin\\Desktop\\plt" + str(len(self.storyGenerator.paragraph_coherences)) + ".png")
-            plt.close(fig)
-
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
 
@@ -193,12 +191,6 @@ class InteractiveStoryUI(object):
             coh = self.storyGenerator.calculateParagraphCoherence(self.storyGenerator.all_paragraphs)
             self.storyGenerator.paragraph_coherences.append(coh)
             print("Coherence is: " + str(coh))
-
-            # Plot coherence graph
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.plot(range(0,len(self.storyGenerator.paragraph_coherences)), self.storyGenerator.paragraph_coherences)
-            fig.savefig("C:\\Users\\admin\\Desktop\\plt" + str(len(self.storyGenerator.paragraph_coherences)) + ".png")
-            plt.close(fig)
 
             # extract entities
             self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
@@ -229,7 +221,7 @@ class InteractiveStoryUI(object):
             button = None
         self.action_buttons.clear()
 
-        actions = self.storyGenerator.generateActions()
+        actions = self.storyGenerator.generateActions(self.paragraph_actions)
 
         for action in actions:
             # 6.2 Continue without taking an action 
@@ -288,12 +280,6 @@ class InteractiveStoryUI(object):
         coh = self.storyGenerator.calculateParagraphCoherence(self.storyGenerator.all_paragraphs)
         self.storyGenerator.paragraph_coherences.append(coh)
         print("Coherence is: " + str(coh))
-
-        # Plot coherence graph
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-        ax.plot(range(0,len(self.storyGenerator.paragraph_coherences)), self.storyGenerator.paragraph_coherences)
-        fig.savefig("C:\\Users\\admin\\Desktop\\plt" + str(len(self.storyGenerator.paragraph_coherences)) + ".png")
-        plt.close(fig)
 
         self.storyGenerator.extractEntities(self.storyGenerator.paragraph)
 

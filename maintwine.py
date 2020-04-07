@@ -13,6 +13,8 @@ import pandas as pd
 from sentiment import Sentiment
 import logging
 import logging.config
+import itertools
+import gender_guesser.detector as gender
 
 
 class TwineGenerator():
@@ -31,8 +33,14 @@ class TwineGenerator():
         self.action_generator = 0
 
         self.DEBUG_OUT = True
+        self.REACT_TO_SENTIMENT = True
+        self.MAX_CHARACTERS = 8
 
         self.sentiment = Sentiment()
+
+        self.GENDER_A = ["unknown", "androgynous", "male", "mostly_male"]
+
+        self.gender_detector = gender.Detector()
         logging.basicConfig(level=logging.DEBUG)
         logging.config.dictConfig({'version': 1, 'disable_existing_loggers': True})
         self.logger = logging.getLogger(__name__)
@@ -154,13 +162,14 @@ class TwineGenerator():
         html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
         paragraph_characters.append(self.storyGenerator.people_in_paragraph.copy())
+        paragraph_characters[len(paragraph_characters)-1].append(self.storyGenerator.name)
         
         self.current_node = 0
         # (N^L-1) / (N-1)
         if self.storyGenerator.MAX_ACTIONS + self.addContinueButton == 1:
             self.total_nodes = self.storyGenerator.paragraphs
         else:
-            self.total_nodes = ((self.storyGenerator.MAX_ACTIONS + self.addContinueButton) ** self.storyGenerator.paragraphs) / ((self.storyGenerator.MAX_ACTIONS-1 + self.addContinueButton))
+            self.total_nodes = ((self.storyGenerator.MAX_ACTIONS + self.addContinueButton) ** self.storyGenerator.paragraphs - 1) / (self.storyGenerator.MAX_ACTIONS-1 + self.addContinueButton)
         self.recursivelyContinue(f, paragraph, html_paragraph, inventory, "1", 1, self.EMPTY_ACTION, all_paragraphs,
             paragraph_coherences, paragraph_sentiments, paragraph_topics, paragraph_actions, paragraph_characters)
 
@@ -173,6 +182,8 @@ class TwineGenerator():
 
     def recursivelyContinue(self, f, text, html, inventory, twineid, depth, action, all_paragraphs, paragraph_coherences,
         paragraph_sentiments, paragraph_topics, paragraph_actions, paragraph_characters):
+
+        start_time_batch = datetime.now()
 
         # generate twine paragraph id
         if twineid == "1":
@@ -196,9 +207,66 @@ class TwineGenerator():
                 self.logger.error("0 Generation error on truncated_text: '" + truncated_text + "'")
                 new_text = ""
             paragraph = action["sentence"] + " " + end_text + " " + new_text
+
+            self.storyGenerator.extractEntities(paragraph)
+            
+
+            # replace new characters?
+            if (self.MAX_CHARACTERS > -1):
+
+                all_characters = list(set(list(itertools.chain.from_iterable(paragraph_characters))))
+
+                new_characters = [x for x in self.storyGenerator.people_in_paragraph if x not in all_characters]
+
+                print("All characters: " + str(all_characters))
+                print("New characters: " + str(new_characters))
+
+                if len(all_characters) + len(new_characters) > self.MAX_CHARACTERS:
+                    logging.info("There are more (" + str(len(all_characters) + len(new_characters)) + ") characters"
+                        + " in the story than allowed. Replacing...")
+                    chars_to_replace = len(all_characters) + len(new_characters) - self.MAX_CHARACTERS
+                    if self.storyGenerator.name in all_characters:
+                        all_characters.remove(self.storyGenerator.name)
+                    if self.storyGenerator.party1 in all_characters:
+                        all_characters.remove(self.storyGenerator.party1)
+                    if self.storyGenerator.party2 in all_characters:
+                        all_characters.remove(self.storyGenerator.party2)
+
+                    group_a = [x for x in all_characters if self.gender_detector.get_gender(x) in self.GENDER_A]
+                    group_b = [x for x in all_characters if self.gender_detector.get_gender(x) not in self.GENDER_A]
+
+                    if (len(group_a) == 0):
+                        print("Names of group a are empty.")
+                        group_a.extend(group_b.copy())
+                    if (len(group_b) == 0):
+                        print("Names of group b are empty.")
+                        group_b.extend(group_a.copy())
+
+                    if len(group_a) > 0 and len(group_b) > 0:
+                        for char in new_characters:
+                            gender = self.gender_detector.get_gender(char)
+                            if gender in self.GENDER_A:
+                                replacement_name = random.choice(group_a)
+                                if len(group_a) > 0:
+                                    group_a.remove(replacement_name)
+                            else:
+                                replacement_name = random.choice(group_b)
+                                if len(group_b) > 0:
+                                    group_b.remove(replacement_name)
+                            print("Replacing " + char + " with " + replacement_name)
+                            paragraph = paragraph.replace(char, replacement_name)
+                            self.storyGenerator.people_in_paragraph = [p.replace(char, replacement_name) for p in self.storyGenerator.people_in_paragraph]
+                            chars_to_replace = chars_to_replace - 1
+                            if chars_to_replace <= 0:
+                                break
+                    else:
+                        print("Cannot replace, replacement names are empty.")
+
+            html_paragraph = paragraph
             
             # coherence
-            all_paragraphs.append(new_text)
+            #all_paragraphs.append(new_text) # This is wrong since action is not appended
+            all_paragraphs.append(paragraph)
             coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
             paragraph_coherences.append(coh[0])
             paragraph_topics.append(coh[1][len(coh[1])-1])
@@ -227,13 +295,11 @@ class TwineGenerator():
                 fig.savefig(self.out_path + r"/coh_" + str(twineid) + ".png")
                 plt.close(fig)
 
-            self.storyGenerator.extractEntities(paragraph)
-            html_paragraph = paragraph
-
             # highlight entities and names
             html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
             html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
             paragraph_characters.append(self.storyGenerator.people_in_paragraph.copy())
+            paragraph_characters[len(paragraph_characters)-1].append(self.storyGenerator.name)
 
             if self.DEBUG_OUT:
                 # https://stackoverflow.com/questions/50821484/python-plotting-missing-data
@@ -242,7 +308,7 @@ class TwineGenerator():
                     for char in chars:
                         if not char in distinct_characters:
                             distinct_characters.append(char)
-                print("Distinct chars: " + str(distinct_characters))
+                self.logger.debug("Distinct chars: " + str(distinct_characters))
 
                 paragraph_list = range(len(paragraph_characters))
                 character_presences = []
@@ -254,19 +320,19 @@ class TwineGenerator():
                             else:
                                 cp.append(np.nan)
                         character_presences.append(cp)
-                print("Character presences: " + str(character_presences))
+                self.logger.debug("Character presences: " + str(character_presences))
 
                 character_dict = dict()
                 for idx, cp in enumerate(character_presences):
                     character_dict[distinct_characters[idx]] = cp
                 df = pd.DataFrame(character_dict, index = paragraph_list)
                 df.index.name = 'paragraphs'
-                print("DF: " + str(df))
 
                 fig, ax = plt.subplots()
+                fig.set_figheight(15)
+                fig.set_figwidth(15)
                 
                 for key in character_dict:
-                    print("Plotting " + str(key))
                     line, = ax.plot(df[key].fillna(method='ffill'), ls = '--', lw = 1, label='_nolegend_')
                     ax.plot(df[key], color=line.get_color(), lw=1.5, marker = 'o')
                 
@@ -278,10 +344,8 @@ class TwineGenerator():
 
                 # replace labels
                 labels=ax.get_yticks().tolist()
-                print("Labels are: " + str(labels))
                 for idx, char in enumerate(distinct_characters):
                     labels[idx] = char
-                print("Labels are now: " + str(labels))
                 ax.set_yticklabels(labels)
 
                 fig.savefig(self.out_path + r"/char_" + str(twineid) + ".png")
@@ -315,7 +379,7 @@ class TwineGenerator():
                 inventory.remove(action["entity"])
                 f.write("<<removeFromInv \""+action["entity"]+"\">>")
             else:
-                logging.debug("Trying to remove " + action["entity"] + " but not in inv.")
+                self.logger.debug("Trying to remove " + action["entity"] + " but not in inv.")
 
         # Store the action in paragraph actions
         if action["simple"] != "":
@@ -325,14 +389,74 @@ class TwineGenerator():
         text = text + " " + action["sentence"]
         truncated_text = self.storyGenerator.truncateLastSentences(text, self.storyGenerator.TRUCATED_LAST_TEXT)
         try:
+            if self.REACT_TO_SENTIMENT:
+                if paragraph_sentiments[len(paragraph_sentiments)-1] == 1:
+                    truncated_text = truncated_text + ". Luckyly, "
+                else:
+                    truncated_text = truncated_text + ". Unfortunately, "
             new_text = self.storyGenerator.generateText(truncated_text)
         except:
-            logging.error("1 Generation error on truncated_text: '" + truncated_text + "'")
+            self.logger.error("1 Generation error on truncated_text: '" + truncated_text + "'")
             new_text = ""
             
         paragraph = action["sentence"] + " " + new_text
+
+        # extract entities
+        self.storyGenerator.extractEntities(paragraph)
+
+        # replace new characters?
+        if (self.MAX_CHARACTERS > -1):
+
+            all_characters = list(set(list(itertools.chain.from_iterable(paragraph_characters))))
+
+            new_characters = [x for x in self.storyGenerator.people_in_paragraph if x not in all_characters]
+
+            print("All characters: " + str(all_characters))
+            print("New characters: " + str(new_characters))
+
+            if len(all_characters) + len(new_characters) > self.MAX_CHARACTERS:
+                logging.info("There are more (" + str(len(all_characters) + len(new_characters)) + ") characters"
+                    + " in the story than allowed. Replacing...")
+                chars_to_replace = len(all_characters) + len(new_characters) - self.MAX_CHARACTERS
+                if self.storyGenerator.name in all_characters:
+                    all_characters.remove(self.storyGenerator.name)
+                if self.storyGenerator.party1 in all_characters:
+                    all_characters.remove(self.storyGenerator.party1)
+                if self.storyGenerator.party2 in all_characters:
+                    all_characters.remove(self.storyGenerator.party2)
+
+                group_a = [x for x in all_characters if self.gender_detector.get_gender(x) in self.GENDER_A]
+                group_b = [x for x in all_characters if self.gender_detector.get_gender(x) not in self.GENDER_A]
+
+                if (len(group_a) == 0):
+                    print("Names of group a are empty.")
+                    group_a.extend(group_b.copy())
+                if (len(group_b) == 0):
+                    print("Names of group b are empty.")
+                    group_b.extend(group_a.copy())
+
+                if len(group_a) > 0 and len(group_b) > 0:
+                    for char in new_characters:
+                        gender = self.gender_detector.get_gender(char)
+                        if gender in self.GENDER_A:
+                            replacement_name = random.choice(group_a)
+                            if len(group_a) > 0:
+                                group_a.remove(replacement_name)
+                        else:
+                            replacement_name = random.choice(group_b)
+                            if len(group_b) > 0:
+                                group_b.remove(replacement_name)
+                        print("Replacing " + char + " with " + replacement_name)
+                        paragraph = paragraph.replace(char, replacement_name)
+                        self.storyGenerator.people_in_paragraph = [p.replace(char, replacement_name) for p in self.storyGenerator.people_in_paragraph]
+                        chars_to_replace = chars_to_replace - 1
+                        if chars_to_replace <= 0:
+                            break
+                else:
+                    print("Cannot replace, replacement names are empty.")
         
-        all_paragraphs.append(new_text)
+        #all_paragraphs.append(new_text) This is wrong since the action is not appended!
+        all_paragraphs.append(paragraph)
         coh = self.storyGenerator.calculateParagraphCoherence(all_paragraphs)
         paragraph_coherences.append(coh[0])
         paragraph_topics.append(coh[1][len(coh[1])-1])
@@ -361,13 +485,13 @@ class TwineGenerator():
             fig.savefig(image_path)
             plt.close(fig)  
 
-        # extract entities
-        self.storyGenerator.extractEntities(paragraph)
+
 
         html_paragraph = paragraph
         html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
         html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
         paragraph_characters.append(self.storyGenerator.people_in_paragraph.copy())
+        paragraph_characters[len(paragraph_characters)-1].append(self.storyGenerator.name)
 
         if self.DEBUG_OUT:
             # https://stackoverflow.com/questions/50821484/python-plotting-missing-data
@@ -376,7 +500,7 @@ class TwineGenerator():
                 for char in chars:
                     if not char in distinct_characters:
                         distinct_characters.append(char)
-            print("Distinct chars: " + str(distinct_characters))
+            self.logger.debug("Distinct chars: " + str(distinct_characters))
 
             paragraph_list = range(len(paragraph_characters))
             character_presences = []
@@ -388,19 +512,19 @@ class TwineGenerator():
                         else:
                             cp.append(np.nan)
                     character_presences.append(cp)
-            print("Character presences: " + str(character_presences))
+            self.logger.debug("Character presences: " + str(character_presences))
 
             character_dict = dict()
             for idx, cp in enumerate(character_presences):
                 character_dict[distinct_characters[idx]] = cp
             df = pd.DataFrame(character_dict, index = paragraph_list)
             df.index.name = 'paragraphs'
-            print("DF: " + str(df))
 
             fig, ax = plt.subplots()
+            fig.set_figheight(15)
+            fig.set_figwidth(15)
             
             for key in character_dict:
-                print("Plotting " + str(key))
                 line, = ax.plot(df[key].fillna(method='ffill'), ls = '--', lw = 1, label='_nolegend_')
                 ax.plot(df[key], color=line.get_color(), lw=1.5, marker = 'o')
             
@@ -412,10 +536,8 @@ class TwineGenerator():
 
             # replace labels
             labels=ax.get_yticks().tolist()
-            print("Labels are: " + str(labels))
             for idx, char in enumerate(distinct_characters):
                 labels[idx] = char
-            print("Labels are now: " + str(labels))
             ax.set_yticklabels(labels)
 
             fig.savefig(self.out_path + r"/char_" + str(twineid) + ".png")
@@ -442,6 +564,10 @@ class TwineGenerator():
 
         for idx, action in enumerate(actions):
             f.write("[[" + action["order"] + "->" + twineid + "_" + str(idx) +"]]\n")
+
+        end_time_batch = datetime.now()
+
+        self.logger.debug("This run took " + str(end_time_batch - start_time_batch) + " milliseconds.")
 
         # simple continue button
         if self.addContinueButton == 1 or len(actions) == 0:
