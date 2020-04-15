@@ -11,6 +11,7 @@ from transformers import AutoTokenizer, AutoModelWithLMHead
 from tqdm import trange
 import math
 import nltk
+from lm_scorer.models.auto import AutoLMScorer as LMScorer
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
@@ -92,20 +93,25 @@ class GPT2:
         if model_scale == 0:
             self.tokenizer = AutoTokenizer.from_pretrained("distilgpt2")
             self.model = AutoModelWithLMHead.from_pretrained("distilgpt2")
+            self.scorer = LMScorer.from_pretrained("distilgpt2", device=self.device)
         elif model_scale == 1:
             self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
             self.model = AutoModelWithLMHead.from_pretrained("gpt2")
+            self.scorer = LMScorer.from_pretrained("gpt2", device=self.device)
         elif model_scale == 2:
             self.tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
             self.model = AutoModelWithLMHead.from_pretrained("gpt2-medium")
+            self.scorer = LMScorer.from_pretrained("gpt2-medium", device=self.device)
         elif model_scale == 3:
             self.tokenizer = AutoTokenizer.from_pretrained("gpt2-large")
             self.model = AutoModelWithLMHead.from_pretrained("gpt2-large")
+            self.scorer = LMScorer.from_pretrained("gpt2-large", device=self.device)
         else:
             self.tokenizer = AutoTokenizer.from_pretrained("gpt2-xl")
             self.model = AutoModelWithLMHead.from_pretrained("gpt2-xl")
+            self.scorer = LMScorer.from_pretrained("gpt2-xl", device=self.device)
         
-        self.model.eval()
+        #self.model.eval()
         self.model.to(self.device)
 
     def generate_texts(self, prefix, length, num_samples):
@@ -114,8 +120,15 @@ class GPT2:
         #return self.tokenizer.decode(
         #    output[0, 0:].tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
         #)
-        input_ids = torch.tensor(self.tokenizer.encode(prefix), device=self.device).unsqueeze(0)
-        outputs = self.model.generate(max_length=length, num_beams=5, input_ids=input_ids, bos_token_id=self.tokenizer.bos_token_id, eos_token_ids=self.tokenizer.eos_token_id, num_return_sequences=num_samples)
+        #input_ids = torch.tensor(self.tokenizer.encode(prefix), device=self.device).unsqueeze(0)
+
+        input_ids = self.tokenizer.encode(prefix, add_special_tokens=False, return_tensors="pt")
+        input_ids = input_ids.to(self.device)
+        outputs = self.model.generate(input_ids=input_ids, max_length=length + len(input_ids[0]),
+            temperature=1, top_k=0, top_p=0.9, repetition_penalty=1,
+            do_sample=True, num_return_sequences=num_samples)
+
+        #outputs = self.model.generate(max_length=length, num_beams=5, input_ids=input_ids, bos_token_id=self.tokenizer.bos_token_id, num_return_sequences=num_samples)
         result = []
         for i in range(num_samples):
             text = self.tokenizer.decode(outputs[i], skip_special_tokens=True)
@@ -138,7 +151,7 @@ class GPT2:
         loss, _ = outputs[:2]
         return math.exp(loss)
 
-    def score_probability(self, sentence):
+    def score_probability2(self, sentence):
         input_ids = torch.tensor([self.tokenizer.encode(sentence)])
         input_ids = input_ids.to(self.device)
         
@@ -156,9 +169,5 @@ class GPT2:
         #print("\n")   
         return probability
 
-    #def predict(self, payload):
-    #    indexed_tokens = self.tokenizer.encode(payload["text"])
-    #    output = sample_sequence(self.model, self.num_words, indexed_tokens, device=self.device)
-    #    return self.tokenizer.decode(
-    #        output[0, 0:].tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
-    #    )
+    def score_probability(self, sentence):
+        return self.scorer.sentence_score(sentence, reduce="mean")

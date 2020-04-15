@@ -49,7 +49,7 @@ class Coherence:
         ldamodel = gensim.models.ldamodel.LdaModel(corpus, num_topics=3, id2word = dictionary, passes=20)
         #print(ldamodel.show_topics())
         topics = []
-        for idx, topic in ldamodel.show_topics(formatted=False, num_words= 30):
+        for idx, topic in ldamodel.show_topics(formatted=False, num_words= 30):#, num_topics=5):
             #print('Topic: {} \nWords: {}'.format(idx, [w[0] for w in topic]))
             topics.append([w[0] for w in topic])
         cm = CoherenceModel(model=ldamodel, corpus=corpus, coherence='u_mass')

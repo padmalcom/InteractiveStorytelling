@@ -25,6 +25,9 @@ class TwineGenerator():
         self.inventory_labels = []
         self.out_path = ""
 
+        self.storyGenerator.CHANCE_TO_REMEMBER_ITEM = 0.0
+        self.storyGenerator.CHANCE_TO_REMEMBER_PERSON = 0.0
+
         self.total_nodes = 0
         self.current_node = 0
 
@@ -33,7 +36,7 @@ class TwineGenerator():
         self.action_generator = 0
 
         self.DEBUG_OUT = True
-        self.REACT_TO_SENTIMENT = True
+        self.REACT_TO_SENTIMENT = False
         self.MAX_CHARACTERS = 8
 
         self.sentiment = Sentiment()
@@ -247,11 +250,11 @@ class TwineGenerator():
                             gender = self.gender_detector.get_gender(char)
                             if gender in self.GENDER_A:
                                 replacement_name = random.choice(group_a)
-                                if len(group_a) > 0:
+                                if len(group_a) > 1:
                                     group_a.remove(replacement_name)
                             else:
                                 replacement_name = random.choice(group_b)
-                                if len(group_b) > 0:
+                                if len(group_b) > 1:
                                     group_b.remove(replacement_name)
                             print("Replacing " + char + " with " + replacement_name)
                             paragraph = paragraph.replace(char, replacement_name)
@@ -320,7 +323,7 @@ class TwineGenerator():
                             else:
                                 cp.append(np.nan)
                         character_presences.append(cp)
-                self.logger.debug("Character presences: " + str(character_presences))
+                #self.logger.debug("Character presences: " + str(character_presences))
 
                 character_dict = dict()
                 for idx, cp in enumerate(character_presences):
@@ -362,10 +365,11 @@ class TwineGenerator():
             if len(paragraph_topics) > 0 and self.DEBUG_OUT:
                 f.write("<table bordercolor=\"white\" style=\"width: 100%\"><tr><td><b>Topics:</b></td><td>" + ", ".join(paragraph_topics[len(paragraph_topics)-1]) + "</td></tr></table><br>")
 
-            if self.DEBUG_OUT:
+            if self.DEBUG_OUT:   
                 f.write("<img style=\"width: 400px; height: auto;\" src=\"coh_" + str(twineid) + ".png\">" +
                     "<img style=\"width: 400px; height: auto;\" src=\"sent_" + str(twineid) + ".png\">" +
-                    "<br>")      
+                    "<img style=\"width: 400px; height: auto;\" src=\"char_" + str(twineid) + ".png\">" +
+                    "<br>")                     
 
             f.write("\n<b>THE END</b>\n")
             return
@@ -440,11 +444,11 @@ class TwineGenerator():
                         gender = self.gender_detector.get_gender(char)
                         if gender in self.GENDER_A:
                             replacement_name = random.choice(group_a)
-                            if len(group_a) > 0:
+                            if len(group_a) > 1:
                                 group_a.remove(replacement_name)
                         else:
                             replacement_name = random.choice(group_b)
-                            if len(group_b) > 0:
+                            if len(group_b) > 1:
                                 group_b.remove(replacement_name)
                         print("Replacing " + char + " with " + replacement_name)
                         paragraph = paragraph.replace(char, replacement_name)
@@ -512,7 +516,7 @@ class TwineGenerator():
                         else:
                             cp.append(np.nan)
                     character_presences.append(cp)
-            self.logger.debug("Character presences: " + str(character_presences))
+            #self.logger.debug("Character presences: " + str(character_presences))
 
             character_dict = dict()
             for idx, cp in enumerate(character_presences):
