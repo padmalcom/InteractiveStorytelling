@@ -85,6 +85,7 @@ def sample_sequence(
 class GPT2:
     def __init__(self, model_scale):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = "cpu"
 
         print("Device is " + str(self.device))
 

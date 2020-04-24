@@ -298,6 +298,11 @@ class TwineGenerator():
                 fig.savefig(self.out_path + r"/coh_" + str(twineid) + ".png")
                 plt.close(fig)
 
+                # log coherences to file
+                with open(self.out_path + r"/coherence.txt", 'a') as coh_file:
+                    for idx,c in enumerate(paragraph_coherences):
+                        coh_file.write(str(idx) + '\t' + str(c) + '\n')
+
             # highlight entities and names
             html_paragraph = self.storyGenerator.highlightEntities(html_paragraph)
             html_paragraph = html_paragraph.replace(self.storyGenerator.name, "<b>" + self.storyGenerator.name + "</b>")
@@ -560,7 +565,7 @@ class TwineGenerator():
 
         # Generate links
         if self.action_generator == 1:
-            actions = self.storyGenerator.generateActionsBert(paragraph_actions)
+            actions = self.storyGenerator.generateActionsBert(paragraph_actions, True)
         elif self.action_generator == 2:
             actions = self.storyGenerator.generateActionsGPT2(paragraph, self.storyGenerator.MAX_ACTIONS, paragraph_actions)
         else:

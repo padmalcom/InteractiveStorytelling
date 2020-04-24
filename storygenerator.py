@@ -48,7 +48,7 @@ class StoryGenerator():
         self.text = ""
         self.html = "<html><body>"
         self.HTML_END = "</body></html>"
-        self.gpt2 = GPT2(1)
+        self.gpt2 = GPT2(0)
         self.USE_NOUNS = True
         self.LIMIT_NOUNS_BY_SYNSETS = True
         self.MAX_ACTIONS = 4
@@ -70,6 +70,7 @@ class StoryGenerator():
         self.bert = Bert()
         self.nlp2 = spacy.load("en_core_web_lg")
         self.nlp2.add_pipe(self.nlp2.create_pipe('sentencizer'), first=True)
+        self.TAKE_SYNONYMS = ["take", "issue", "acquire", "withdraw", "consume", "accept", "claim"]
         
 
         # try:
@@ -374,7 +375,7 @@ class StoryGenerator():
                 text = text.replace(noun, "<b><font color=\"blue\">" + noun + "</font></b>")
         return text
 
-    def generateActionsBert(self, paragraph_actions):
+    def generateActionsBert(self, paragraph_actions, prioritize_take=False):
         all_actions = []
 
         for person in self.people_in_paragraph:
@@ -440,6 +441,15 @@ class StoryGenerator():
                     "simple": simple_action, "probability":probability, "order": order})
 
         print("Identified " + str(len(all_actions)) + " plausible actions.")
+
+        # prioritize "take" action
+        if prioritize_take:
+            for a in all_actions:
+                if a["action"] in self.TAKE_SYNONYMS:
+                    print(a["action"] + " is a synonym")
+                    a["probability"] = sys.float_info.max
+
+        # sort actions by probability
         sorted_actions = sorted(all_actions, key=operator.itemgetter("probability"))
 
         if len(sorted_actions) == 0:
@@ -450,7 +460,7 @@ class StoryGenerator():
 
         sorted_actions = [x for x in sorted_actions if x["simple"] not in paragraph_actions]
         if len(sorted_actions) == 0:
-            sorted_actions.append(saved_action)
+            sorted_actions.append(saved_action)           
 
         if (self.MAX_ACTIONS > -1):
             sorted_actions = sorted_actions[:self.MAX_ACTIONS]
