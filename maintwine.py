@@ -197,7 +197,7 @@ class TwineGenerator():
             f.write("::" + str(twineid) + "\n")
 
         self.current_node += 1
-        self.logger.info("Calculating node " + str(self.current_node) + "/" + str(self.total_nodes) + " (depth: " + str(depth) + ") ...")
+        self.logger.info("Calculating node " + str(self.current_node) + "/" + str(int(self.total_nodes)) + " (depth: " + str(depth) + ") ...")
 
         # end reached?
         if (depth == self.storyGenerator.paragraphs):
@@ -380,7 +380,9 @@ class TwineGenerator():
             return
   
         # process given action
-        if action["action"] == "take":
+        print("Reviewing action " + action["action"])
+        if action["action"] in self.storyGenerator.TAKE_SYNONYMS:
+            self.logger.debug("Take found!")
             inventory.append(action["entity"])
             f.write("<<addToInv \""+action["entity"]+"\">>")
         elif action["action"] == "use" and action["type"] == "item_from_inventory":

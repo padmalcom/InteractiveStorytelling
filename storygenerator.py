@@ -71,7 +71,7 @@ class StoryGenerator():
         self.bert = Bert()
         self.nlp2 = spacy.load("en_core_web_lg")
         self.nlp2.add_pipe(self.nlp2.create_pipe('sentencizer'), first=True)
-        self.TAKE_SYNONYMS = ["take", "issue", "acquire", "withdraw", "consume", "accept", "claim"]
+        self.TAKE_SYNONYMS = ["take", "issue", "acquire", "withdraw", "consume", "accept", "claim", "buy", "steal"]
         self.SPECIAL_CHARACTERS = re.compile('[@_!#$%^&*()<>?/\|}{~:]\'') 
         
 
