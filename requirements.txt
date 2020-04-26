@@ -23,7 +23,6 @@ dataclasses==0.7
 decorator==4.4.1
 Deprecated==1.2.7
 docutils==0.15.2
-en-core-web-lg==2.2.0
 filelock==3.0.12
 flair==0.4.4
 future==0.18.2
@@ -108,8 +107,6 @@ thinc==7.1.1
 tiny-tokenizer==3.0.1
 tokenizers==0.5.2
 toposort==1.5
-torch==1.4.0+cu92
-torchvision==0.5.0+cu92
 tqdm==4.36.1
 traitlets==4.3.3
 transformers==2.8.0

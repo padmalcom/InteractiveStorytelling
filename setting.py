@@ -14,7 +14,8 @@ settings = {
     "sci-fy": Setting("Sci-Fy", ["In rain and wind, the world had changed. All of a sudden they had been there, the storm was their dark harbinger who had accompanied them for so many light years. Their destination, your world, my world, another world and then, then the storm would continue to accompany them on their long journey through the wide open spaces of the galaxies.  Never they come alone, never without a plan, before them others were already here and after them, what will remain then. [name] went on a journey to explore where they came from.", "[name] already has enough problems in the Concordia base Lachanx, e.g. the lousy canteen food, various mental ailments and the annoying commander Sator. But the latest problem at his side robs him of his last nerve - although it is mainly characterized by silence. Unfortunately, his membership in the Peace Corps is now at stake, which forces [name] to become friends with this new problem."],["This was the end of the word. There were storms and fires. [name] could not get it.","The Concordia base Lachanx lay in bright sunlight."]
     ),
     "harry potter": Setting("Harry Potter", ["Harry was in love with Hermione. They know each other for four years now and finally felt that they belong together. When they were alone in the Griffindor rooms, they hugged each other for a long time and before Harry knew what he was up to he kissed her gently on the lips."], ["They married on a rainy saturday with all their friends and family around them."]
-    )
+    ),
+    "simple": Setting("Simple", ["Winter had recently arrived and Peter sat at the window and watched the thick flakes fall from the sky. The crisis, which had forced them all to stay at home for months, had hardly subsided."], ["The vaccine was suddenly announced in the news. Success was eventually won by a smaller British pharmaceutical company."])
 }
 
 coherence_phrases = ["[person] rolled [hisher] eyes.",
