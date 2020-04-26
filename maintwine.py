@@ -35,9 +35,9 @@ class TwineGenerator():
 
         self.action_generator = 0
 
-        self.DEBUG_OUT = True
+        self.DEBUG_OUT = False
         self.REACT_TO_SENTIMENT = False
-        self.MAX_CHARACTERS = 8
+        self.MAX_CHARACTERS = -1
 
         self.sentiment = Sentiment()
 
