@@ -11,7 +11,8 @@ class Bert:
         self.lemmatizer = WordNetLemmatizer() 
     
     def getBestPredicateAndProbability(self, subj, obj, lemmatize=True, random_choice=True):
-        res = self.nlp(subj + " <mask> " + obj + ".")
+        res = self.nlp(subj + " <mask> " + obj + ".", )
+        print(res)
         for r in res:
             #print(r)
             sentence = r['sequence'].replace("<s>", "").replace("</s>", "")
@@ -36,7 +37,7 @@ class Bert:
             return "", 0.0
 
     def combineTo(self, item1, item2):
-        res = self.nlp("He combined " + item1 + " and " + item2 + " and received a <mask>.")
+        res = self.nlp("He combined " + item1 + " with " + item2 + " to build a <mask>.")
         print(res)
         for r in res:
             sentence = r['sequence'].replace("<s>", "").replace("</s>", "")
