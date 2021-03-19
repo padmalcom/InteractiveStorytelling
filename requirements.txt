@@ -64,7 +64,7 @@ packaging==19.2
 pandas==1.0.3
 parso==0.5.1
 pickleshare==0.7.5
-Pillow==6.2.1
+Pillow==8.1.1
 plac==0.9.6
 pluggy==0.13.0
 preshed==3.0.2
